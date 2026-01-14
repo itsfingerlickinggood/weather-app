@@ -1,13 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { configureApiAuth } from '../lib/api'
 import { getSession, loginLocal, logoutLocal, signupLocal } from '../lib/localAuth'
 
 const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
+  const autoLoginDemo = import.meta.env.VITE_AUTO_LOGIN_DEMO === 'true'
   const [user, setUser] = useState(() => getSession())
-  const [status, setStatus] = useState('ready')
+  const [status, setStatus] = useState(() => (autoLoginDemo ? 'loading' : 'ready'))
   const [error, setError] = useState('')
+  const autoFiredRef = useRef(false)
 
   const handleLogout = useCallback(() => {
     logoutLocal()
@@ -66,11 +68,14 @@ export const AuthProvider = ({ children }) => {
   )
 
   useEffect(() => {
-    const auto = import.meta.env.VITE_AUTO_LOGIN_DEMO === 'true'
-    if (auto && !user && status === 'ready') {
+    if (!autoLoginDemo) return
+    if (!user && !autoFiredRef.current) {
+      autoFiredRef.current = true
       login('user@example.com', 'password')
+    } else if (user && status === 'loading') {
+      setStatus('ready')
     }
-  }, [login, status, user])
+  }, [autoLoginDemo, login, status, user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

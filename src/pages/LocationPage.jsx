@@ -138,46 +138,36 @@ const LocationPage = () => {
   const { pushToast } = useUI()
   const firedRef = useRef({})
 
-  const isFavorite = useMemo(() => favoritesQuery.data?.includes(id), [favoritesQuery.data, id])
-
-  const toggleFavorite = () => {
-    if (isFavorite) {
-      removeFavorite.mutate(id)
-    } else {
-      addFavorite.mutate(id)
-    }
-  }
-
-  if (locationQuery.isLoading || weatherQuery.isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10" />
-        <Skeleton className="h-40" />
-        <Skeleton className="h-20" />
-      </div>
-    )
-  }
-
-  if (locationQuery.error || weatherQuery.error) {
-    return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm">Unable to load location.</div>
-  }
-
-  const weatherPayload = weatherQuery.data || {}
-  const offline = weatherQuery.data?.offline
-  const aqiMeta = useMemo(() => categorizeAqi(weatherPayload?.aqi), [weatherPayload?.aqi])
+  // All useState hooks must be at the top, before any early returns
   const [profile, setProfile] = useState('general')
+
+  // Get weather data (may be empty object if loading)
+  const weatherPayload = weatherQuery.data || {}
+
+  // All useMemo hooks must be at the top, before any early returns
+  const isFavorite = useMemo(() => favoritesQuery.data?.includes(id), [favoritesQuery.data, id])
+  const aqiMeta = useMemo(() => categorizeAqi(weatherPayload?.aqi), [weatherPayload?.aqi])
   const activityMeta = useMemo(() => buildActivityAdvice(weatherPayload, profile), [profile, weatherPayload])
   const clothingAdvice = useMemo(() => buildClothingAdvice(weatherPayload), [weatherPayload])
-  const cloudCoverPct = Math.round(Math.max(0, Math.min(100, (weatherPayload?.cloudCover ?? 0) * 100)))
-  const comfortIndex = weatherPayload?.comfortIndex ?? 70
-  const rainStreak = weatherPayload?.rainStreakDays ?? 0
-  const seaTemp = weatherPayload?.seaTemp
-  const feelsLike = weatherPayload?.feelsLike ?? weatherPayload?.temp
-  const seaMeter = seaTemp ? Math.min(100, Math.max(0, seaTemp - 60)) : 0
   const safety = useMemo(() => buildSafetyStatus(weatherPayload, riskQuery.data), [riskQuery.data, weatherPayload])
 
+  const locationFallback = useMemo(() => {
+    if (!weatherPayload?.locationMeta) return null
+    return {
+      name: weatherPayload.locationMeta.name,
+      region: [weatherPayload.locationMeta.region, weatherPayload.locationMeta.country].filter(Boolean).join(', '),
+      lat: weatherPayload.locationMeta.lat,
+      lon: weatherPayload.locationMeta.lon,
+      tags: ['Live city'],
+      zone: weatherPayload.locationMeta.region || weatherPayload.locationMeta.country || 'Live city',
+    }
+  }, [weatherPayload?.locationMeta])
+
+  const locationData = locationQuery.data || locationFallback
+
+  // All useEffect hooks must be at the top, before any early returns
   useEffect(() => {
-    if (!weatherPayload) return
+    if (!weatherPayload || !Object.keys(weatherPayload).length) return
     const fireOnce = (key, msg, tone) => {
       if (firedRef.current[key]) return
       firedRef.current[key] = true
@@ -196,16 +186,48 @@ const LocationPage = () => {
     }
   }, [alertsQuery.data, weatherPayload])
 
+  const toggleFavorite = () => {
+    if (isFavorite) {
+      removeFavorite.mutate(id)
+    } else {
+      addFavorite.mutate(id)
+    }
+  }
+
+  // Early returns for loading/error states - AFTER all hooks
+  if (locationQuery.isLoading || weatherQuery.isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10" />
+        <Skeleton className="h-40" />
+        <Skeleton className="h-20" />
+      </div>
+    )
+  }
+
+  if ((!locationData && locationQuery.error) || weatherQuery.error) {
+    return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm">Unable to load location.</div>
+  }
+
+  // Derived values (not hooks, so they can be after early returns)
+  const offline = weatherQuery.data?.offline
+  const cloudCoverPct = Math.round(Math.max(0, Math.min(100, (weatherPayload?.cloudCover ?? 0) * 100)))
+  const comfortIndex = weatherPayload?.comfortIndex ?? 70
+  const rainStreak = weatherPayload?.rainStreakDays ?? 0
+  const seaTemp = weatherPayload?.seaTemp
+  const feelsLike = weatherPayload?.feelsLike ?? weatherPayload?.temp
+  const seaMeter = seaTemp ? Math.min(100, Math.max(0, seaTemp - 60)) : 0
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase text-slate-400">{locationQuery.data?.region}</p>
-          <h1 className="text-2xl font-semibold text-white">{locationQuery.data?.name}</h1>
-          <p className="text-sm text-slate-300">Lat {locationQuery.data?.lat} / Lon {locationQuery.data?.lon}</p>
+          <p className="text-sm uppercase text-slate-400">{locationData?.region}</p>
+          <h1 className="text-2xl font-semibold text-white">{locationData?.name}</h1>
+          <p className="text-sm text-slate-300">Lat {locationData?.lat} / Lon {locationData?.lon}</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {locationQuery.data?.zone ? <Badge tone="neutral" label={locationQuery.data.zone} /> : null}
-            {(locationQuery.data?.tags || []).map((tag) => (
+            {locationData?.zone ? <Badge tone="neutral" label={locationData.zone} /> : null}
+            {(locationData?.tags || []).map((tag) => (
               <span key={tag} className="rounded-full bg-white/10 px-3 py-1 text-[11px] text-slate-100">
                 {tag}
               </span>

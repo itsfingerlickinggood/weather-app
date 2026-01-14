@@ -280,11 +280,13 @@ export const fetchOpenMeteoWeather = async ({ lat, lon }) => {
   return mapOpenMeteo(data)
 }
 
-export const fetchWeatherApi = async ({ q }) => {
+export const fetchWeatherApi = async ({ q, lat, lon }) => {
   if (!USE_LIVE_WEATHER || !WEATHERAPI_KEY) return null
+  const qParam = lat != null && lon != null ? `${lat},${lon}` : q
+  if (!qParam) return null
   const params = new URLSearchParams({
     key: WEATHERAPI_KEY,
-    q,
+    q: qParam,
     days: '14',
     aqi: 'yes',
     alerts: 'yes',

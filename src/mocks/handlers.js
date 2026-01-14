@@ -1,5 +1,5 @@
 import { HttpResponse, delay, http } from 'msw'
-import { buildLiveWeather, fetchWeatherApi, shouldUseLiveWeather } from '../lib/liveWeather'
+import { buildLiveWeather, fetchWeatherApi, searchWeatherApi, shouldUseLiveWeather } from '../lib/liveWeather'
 
 const users = [
   { id: '1', email: 'admin@example.com', password: 'password', name: 'Ava Admin', roles: ['admin', 'user'] },
@@ -445,7 +445,16 @@ export const handlers = [
 
     if (useLiveWeather) {
       try {
-        const live = await fetchWeatherApi({ q: deriveQuery(params.id) })
+        const query = deriveQuery(params.id)
+        let live = await fetchWeatherApi({ q: query })
+        if (!live) {
+          const matches = await searchWeatherApi({ q: query })
+          const first = matches?.[0]
+          if (first) {
+            live = await fetchWeatherApi({ lat: first.lat, lon: first.lon, q: first.name })
+            if (live && first) live.locationMeta = { ...(live.locationMeta || {}), ...first }
+          }
+        }
         if (live?.locationMeta) {
           const loc = {
             id: params.id,
@@ -483,7 +492,15 @@ export const handlers = [
 
     if ((!meta || !fallback) && useLiveWeather) {
       try {
-        const live = await fetchWeatherApi({ q: deriveQuery(params.id) })
+        const query = deriveQuery(params.id)
+        let live = await fetchWeatherApi({ q: query })
+        if (!live) {
+          const matches = await searchWeatherApi({ q: query })
+          const first = matches?.[0]
+          if (first) {
+            live = await fetchWeatherApi({ lat: first.lat, lon: first.lon, q: first.name })
+          }
+        }
         if (live) return HttpResponse.json({ locationId: params.id, ...live, user: user.id })
       } catch (err) {
         console.warn('Live weather lookup failed', err)
@@ -508,7 +525,13 @@ export const handlers = [
     }
     if ((!meta || !fallback) && useLiveWeather) {
       try {
-        const live = await fetchWeatherApi({ q: deriveQuery(params.id) })
+        const query = deriveQuery(params.id)
+        let live = await fetchWeatherApi({ q: query })
+        if (!live) {
+          const matches = await searchWeatherApi({ q: query })
+          const first = matches?.[0]
+          if (first) live = await fetchWeatherApi({ lat: first.lat, lon: first.lon, q: first.name })
+        }
         if (live) return HttpResponse.json({ hours: live.hourly || [] })
       } catch (err) {
         console.warn('Live hourly lookup failed', err)
@@ -531,7 +554,13 @@ export const handlers = [
     }
     if ((!meta || !fallback) && useLiveWeather) {
       try {
-        const live = await fetchWeatherApi({ q: deriveQuery(params.id) })
+        const query = deriveQuery(params.id)
+        let live = await fetchWeatherApi({ q: query })
+        if (!live) {
+          const matches = await searchWeatherApi({ q: query })
+          const first = matches?.[0]
+          if (first) live = await fetchWeatherApi({ lat: first.lat, lon: first.lon, q: first.name })
+        }
         if (live) return HttpResponse.json({ forecast: live.forecast || [] })
       } catch (err) {
         console.warn('Live forecast lookup failed', err)
@@ -554,7 +583,13 @@ export const handlers = [
     }
     if ((!meta || !fallback) && useLiveWeather) {
       try {
-        const live = await fetchWeatherApi({ q: deriveQuery(params.id) })
+        const query = deriveQuery(params.id)
+        let live = await fetchWeatherApi({ q: query })
+        if (!live) {
+          const matches = await searchWeatherApi({ q: query })
+          const first = matches?.[0]
+          if (first) live = await fetchWeatherApi({ lat: first.lat, lon: first.lon, q: first.name })
+        }
         if (live) return HttpResponse.json({ forecast: live.forecast14 || live.forecast || [] })
       } catch (err) {
         console.warn('Live forecast14 lookup failed', err)

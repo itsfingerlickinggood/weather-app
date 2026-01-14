@@ -28,8 +28,22 @@ const TopBar = () => {
         </div>
       </div>
       <div className="flex items-center gap-2 text-sm">
-        <button className="focus-ring rounded-full bg-white/5 px-3 py-1 text-xs" onClick={toggleTheme}>
-          {theme === 'dark' ? 'Dark' : 'Light'}
+        <button 
+          className="focus-ring flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium transition-all hover:bg-white/10 theme-toggle" 
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? (
+            <>
+              <span className="text-sm">🌙</span>
+              <span>Dark</span>
+            </>
+          ) : (
+            <>
+              <span className="text-sm">☀️</span>
+              <span>Light</span>
+            </>
+          )}
         </button>
         {user ? (
           <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-xs text-slate-100">

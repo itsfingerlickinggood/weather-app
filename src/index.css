@@ -5,9 +5,34 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family: "Sora", "Manrope", "Helvetica Neue", sans-serif;
-  background-color: #0b1021;
+  
+  /* Dark theme (default) */
+  --bg-primary: #0b1021;
+  --bg-secondary: rgba(15, 23, 42, 0.7);
+  --bg-card: rgba(15, 23, 42, 0.7);
+  --bg-surface: rgba(255, 255, 255, 0.05);
+  --text-primary: #e8ecf5;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: rgba(255, 255, 255, 0.05);
+  --accent-gradient-1: rgba(58, 125, 247, 0.2);
+  --accent-gradient-2: rgba(120, 94, 255, 0.18);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary: #f8fafc;
+  --bg-secondary: rgba(255, 255, 255, 0.9);
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-surface: rgba(15, 23, 42, 0.05);
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --border-color: rgba(15, 23, 42, 0.1);
+  --accent-gradient-1: rgba(58, 125, 247, 0.12);
+  --accent-gradient-2: rgba(120, 94, 255, 0.1);
 }
 
 body {
@@ -15,12 +40,23 @@ body {
   min-height: 100vh;
   background: radial-gradient(
       circle at 15% 20%,
-      rgba(58, 125, 247, 0.2),
+      var(--accent-gradient-1),
       transparent 25%
     ),
-    radial-gradient(circle at 80% 0%, rgba(120, 94, 255, 0.18), transparent 28%),
-    #0b1021;
-  color: #e8ecf5;
+    radial-gradient(circle at 80% 0%, var(--accent-gradient-2), transparent 28%),
+    var(--bg-primary);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+[data-theme="light"] body {
+  background: radial-gradient(
+      circle at 15% 20%,
+      var(--accent-gradient-1),
+      transparent 35%
+    ),
+    radial-gradient(circle at 80% 0%, var(--accent-gradient-2), transparent 38%),
+    linear-gradient(180deg, #f0f4ff 0%, #f8fafc 50%, #ffffff 100%);
 }
 
 body[data-sky="rain"] {
@@ -162,9 +198,128 @@ body[data-sky="heat"] {
 }
 
 .card-surface {
-  @apply rounded-2xl bg-slate-900/70 border border-white/5 shadow-2xl shadow-blue-950/30 backdrop-blur-sm;
+  @apply rounded-2xl border shadow-2xl backdrop-blur-sm;
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  box-shadow: 0 25px 50px -12px rgba(30, 64, 175, 0.15);
+}
+
+[data-theme="light"] .card-surface {
+  box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
 }
 
 .focus-ring {
   @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400;
+}
+
+/* Theme-aware utility overrides */
+[data-theme="light"] .bg-slate-900\/70,
+[data-theme="light"] .bg-slate-900\/60,
+[data-theme="light"] .bg-slate-900\/50 {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+[data-theme="light"] .bg-white\/5,
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme="light"] .border-white\/5,
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+[data-theme="light"] .text-white {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .text-slate-100 {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .text-slate-200 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .text-slate-300 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .text-slate-50 {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] header.bg-slate-900\/70 {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-theme="light"] aside {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.98) 100%) !important;
+  border-right-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-theme="light"] aside a,
+[data-theme="light"] aside button {
+  color: #475569 !important;
+}
+
+[data-theme="light"] aside a:hover,
+[data-theme="light"] aside button:hover {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+  color: #2563eb !important;
+}
+
+/* Badge adjustments for light theme */
+[data-theme="light"] .bg-emerald-500\/20 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+
+[data-theme="light"] .bg-amber-500\/20 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+
+[data-theme="light"] .bg-red-500\/20 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+[data-theme="light"] .bg-blue-500\/20 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+/* Gradient text adjustments */
+[data-theme="light"] .text-emerald-200,
+[data-theme="light"] .text-emerald-300 {
+  color: #059669 !important;
+}
+
+[data-theme="light"] .text-amber-200,
+[data-theme="light"] .text-amber-100 {
+  color: #d97706 !important;
+}
+
+[data-theme="light"] .text-blue-200 {
+  color: #2563eb !important;
+}
+
+/* Input styling for light theme */
+[data-theme="light"] input,
+[data-theme="light"] select {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  color: #1e293b !important;
+}
+
+[data-theme="light"] input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Theme toggle button enhancement */
+[data-theme="light"] .theme-toggle {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  color: #2563eb !important;
 }
