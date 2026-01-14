@@ -1,0 +1,170 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Manrope:wght@400;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  font-family: "Sora", "Manrope", "Helvetica Neue", sans-serif;
+  background-color: #0b1021;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(
+      circle at 15% 20%,
+      rgba(58, 125, 247, 0.2),
+      transparent 25%
+    ),
+    radial-gradient(circle at 80% 0%, rgba(120, 94, 255, 0.18), transparent 28%),
+    #0b1021;
+  color: #e8ecf5;
+}
+
+body[data-sky="rain"] {
+  background: radial-gradient(
+      circle at 20% 30%,
+      rgba(58, 125, 247, 0.3),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(52, 211, 153, 0.25),
+      transparent 28%
+    ),
+    linear-gradient(120deg, rgba(12, 20, 40, 0.95), rgba(12, 26, 58, 0.85));
+  background-size: 140% 140%;
+  animation: drizzle 12s ease-in-out infinite;
+}
+
+body[data-sky="storm"] {
+  background: radial-gradient(
+      circle at 30% 30%,
+      rgba(126, 34, 206, 0.35),
+      transparent 30%
+    ),
+    linear-gradient(180deg, rgba(7, 10, 22, 0.95), rgba(18, 22, 40, 0.9));
+  background-size: 140% 140%;
+  animation: pulseStorm 10s ease-in-out infinite;
+}
+
+body[data-sky="heat"] {
+  background: radial-gradient(
+      circle at 25% 30%,
+      rgba(234, 179, 8, 0.3),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 70% 20%,
+      rgba(249, 115, 22, 0.25),
+      transparent 30%
+    ),
+    linear-gradient(160deg, rgba(24, 16, 40, 0.9), rgba(44, 25, 20, 0.85));
+  animation: heatwave 14s ease-in-out infinite;
+}
+
+@keyframes drizzle {
+  0% {
+    background-position: 0% 50%, 100% 50%, 0 0;
+  }
+  50% {
+    background-position: 50% 60%, 50% 40%, 100% 100%;
+  }
+  100% {
+    background-position: 0% 50%, 100% 50%, 0 0;
+  }
+}
+
+@keyframes pulseStorm {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.15);
+  }
+}
+
+@keyframes heatwave {
+  0% {
+    filter: saturate(0.9);
+  }
+  50% {
+    filter: saturate(1.1);
+  }
+  100% {
+    filter: saturate(0.9);
+  }
+}
+
+.radar-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: radial-gradient(
+      circle at 30% 30%,
+      rgba(37, 99, 235, 0.15),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 70% 20%,
+      rgba(16, 185, 129, 0.18),
+      transparent 40%
+    ),
+    rgba(15, 23, 42, 0.6);
+  padding: 1rem;
+}
+
+.radar-sweep {
+  position: absolute;
+  inset: -25%;
+  background: conic-gradient(
+    from 90deg,
+    rgba(59, 130, 246, 0.35),
+    rgba(59, 130, 246, 0) 40%
+  );
+  animation: sweep 6s linear infinite;
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.radar-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+      circle at 20% 20%,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px
+    ),
+    radial-gradient(
+      circle at 70% 60%,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px
+    );
+  background-size: 120px 120px;
+  pointer-events: none;
+}
+
+@keyframes sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.card-surface {
+  @apply rounded-2xl bg-slate-900/70 border border-white/5 shadow-2xl shadow-blue-950/30 backdrop-blur-sm;
+}
+
+.focus-ring {
+  @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400;
+}
