@@ -78,12 +78,14 @@ const Dashboard = () => {
       alp: { humidity: 86, rain: 82, wind: 46, icon: '🛶' },
       way: { humidity: 74, rain: 60, wind: 50, icon: '🌿' },
     }
-    return locations.map((loc) => {
-      const preset = presets[loc.id] || { humidity: 72, rain: 60, wind: 48, icon: '🌀' }
-      const zone = (loc.zone || loc.region || '').toLowerCase()
-      const gradient = zone.includes('hill') || zone.includes('high') ? 'from-emerald-400 to-cyan-300' : 'from-blue-400 to-amber-300'
-      return { ...loc, ...preset, gradient }
-    })
+    return locations
+      .map((loc) => {
+        const preset = presets[loc.id] || { humidity: 72, rain: 60, wind: 48, icon: '🌀' }
+        const zone = (loc.zone || loc.region || '').toLowerCase()
+        const gradient = zone.includes('hill') || zone.includes('high') ? 'from-emerald-400 to-cyan-300' : 'from-blue-400 to-amber-300'
+        return { ...loc, ...preset, gradient }
+      })
+      .slice(0, 5) // limit to 5 locations on home page to avoid overcrowding
   }, [locations])
 
   const keralaSignals = useMemo(

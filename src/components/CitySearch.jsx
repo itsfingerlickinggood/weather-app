@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLocations } from '../hooks/queries'
 import { searchWeatherApi } from '../lib/liveWeather'
+import { registerDynamicLocation, geocodeGenericCity } from '../lib/openMeteo'
 
 const normalize = (value = '') => value.trim().toLowerCase()
 
@@ -72,7 +73,7 @@ const CitySearch = ({ compact = false, onSelect }) => {
         const first = results?.[0]
         if (first) {
           const slug = `q-${encodeURIComponent(first.name || query || 'city')}`
-          const dynamicLoc = {
+          const dynamicLoc = registerDynamicLocation({
             id: slug,
             name: first.name,
             region: [first.region, first.country].filter(Boolean).join(', '),
@@ -81,12 +82,22 @@ const CitySearch = ({ compact = false, onSelect }) => {
             provider: 'weatherapi',
             tags: ['Live city'],
             zone: first.region || first.country || 'Live city',
-          }
+          })
           setError('')
           setOpen(false)
           setQuery(dynamicLoc.name)
           navigate(`/locations/${dynamicLoc.id}`)
           onSelect?.(dynamicLoc)
+          return
+        }
+        // Fallback to Open-Meteo geocoder for global cities
+        const geoLoc = await geocodeGenericCity(query)
+        if (geoLoc) {
+          setError('')
+          setOpen(false)
+          setQuery(geoLoc.name)
+          navigate(`/locations/${geoLoc.id}`)
+          onSelect?.(geoLoc)
           return
         }
       } catch (err) {

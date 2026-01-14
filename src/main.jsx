@@ -33,7 +33,7 @@ const renderApp = () => {
   )
 }
 
-const shouldUseMocks = import.meta.env.DEV
+const shouldUseMocks = import.meta.env.VITE_USE_MSW === 'true'
 
 async function enableMocks() {
   if (shouldUseMocks) {

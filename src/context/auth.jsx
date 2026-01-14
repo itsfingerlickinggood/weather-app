@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { configureApiAuth } from '../lib/api'
+import { configureApiAuth, readStoredTokens } from '../lib/api'
 import { getSession, loginLocal, logoutLocal, signupLocal } from '../lib/localAuth'
 
 const AuthContext = createContext(null)
@@ -13,12 +13,20 @@ export const AuthProvider = ({ children }) => {
 
   const handleLogout = useCallback(() => {
     logoutLocal()
+    localStorage.removeItem('awi_tokens')
     setUser(null)
   }, [])
 
   useEffect(() => {
     configureApiAuth({
-      getTokensFn: () => ({ userEmail: user?.email, roles: user?.roles }),
+      getTokensFn: () => {
+        const stored = readStoredTokens()
+        return {
+          ...stored,
+          userEmail: user?.email || stored.userEmail,
+          roles: user?.roles || stored.roles,
+        }
+      },
       refreshFn: null,
       logoutFn: () => handleLogout(),
     })

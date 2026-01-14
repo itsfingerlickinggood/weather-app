@@ -4,7 +4,23 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
 })
 
-let getTokens = () => ({ accessToken: null, refreshToken: null, userEmail: null, roles: [] })
+export const readStoredTokens = () => {
+  try {
+    const raw = localStorage.getItem('awi_tokens')
+    if (!raw) return { accessToken: null, refreshToken: null, userEmail: null, roles: [] }
+    const parsed = JSON.parse(raw)
+    return {
+      accessToken: parsed.accessToken || null,
+      refreshToken: parsed.refreshToken || null,
+      userEmail: parsed.userEmail || null,
+      roles: parsed.roles || [],
+    }
+  } catch (_err) {
+    return { accessToken: null, refreshToken: null, userEmail: null, roles: [] }
+  }
+}
+
+let getTokens = () => readStoredTokens()
 let refreshTokens = null
 let logout = null
 let isRefreshing = false
@@ -17,13 +33,12 @@ export const configureApiAuth = ({ getTokensFn, refreshFn, logoutFn }) => {
 }
 
 api.interceptors.request.use((config) => {
-  const { accessToken } = getTokens()
-  const { userEmail, roles } = getTokens()
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`
+  const tokens = getTokens() || {}
+  if (tokens.accessToken) {
+    config.headers.Authorization = `Bearer ${tokens.accessToken}`
   }
-  if (userEmail) {
-    config.headers['x-local-user'] = JSON.stringify({ email: userEmail, roles })
+  if (tokens.userEmail) {
+    config.headers['x-local-user'] = JSON.stringify({ email: tokens.userEmail, roles: tokens.roles || [] })
   }
   return config
 })

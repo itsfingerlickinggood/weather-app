@@ -20,6 +20,7 @@ const persistSession = (user) => {
 }
 
 const clearSession = () => localStorage.removeItem(SESSION_KEY)
+const clearTokens = () => localStorage.removeItem('awi_tokens')
 
 export const getSession = () => {
   try {
@@ -50,6 +51,7 @@ export const signupLocal = (email, password) => {
 
 export const logoutLocal = () => {
   clearSession()
+  clearTokens()
 }
 
 export const getUsers = () => loadUsers()

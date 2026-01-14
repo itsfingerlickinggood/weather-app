@@ -36,7 +36,7 @@ const LoginPage = () => {
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6">
-      <Card title="Access your weather" description="Local-only auth. No external services.">
+      <Card title="Sign in to your weather" description="Local-only auth. No external services.">
         <div className="flex gap-2 text-sm">
           <button
             type="button"

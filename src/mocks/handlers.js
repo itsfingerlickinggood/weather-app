@@ -17,7 +17,7 @@ const locationCatalog = {
     city: 'Thiruvananthapuram',
     cityId: 'thiruvananthapuram',
     zone: 'Capital coast',
-    tags: ['Arabian Sea breeze', 'Evening showers', 'Beachfront sunsets'],
+    tags: ['Arabian coastal breeze', 'Evening showers', 'Beachfront sunsets'],
   },
   cok: {
     id: 'cok',
@@ -154,7 +154,7 @@ const weatherById = {
     visibility: 7,
     cloudCover: 0.64,
     comfortIndex: 72,
-    monsoonPhase: 'Sea breeze + active drizzle',
+    monsoonPhase: 'Onshore drizzle pulse',
     rainStreakDays: 2,
     hourly: makeHours({ baseTemp: 84, baseAqi: 50, baseUv: 8, basePrecip: 0.14, tempStep: 1.2, precipStep: 0.02 }),
     forecast: [
