@@ -1,4 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Manrope:wght@400;600;700&display=swap");
+@import "bootstrap/dist/css/bootstrap.min.css";
 
 @tailwind base;
 @tailwind components;
@@ -7,7 +8,7 @@
 :root {
   color-scheme: dark;
   font-family: "Sora", "Manrope", "Helvetica Neue", sans-serif;
-  
+
   /* Dark theme (default) */
   --bg-primary: #0b1021;
   --bg-secondary: rgba(15, 23, 42, 0.7);
@@ -205,7 +206,8 @@ body[data-sky="heat"] {
 }
 
 [data-theme="light"] .card-surface {
-  box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.1),
+    0 4px 6px -4px rgba(15, 23, 42, 0.05);
 }
 
 .focus-ring {
@@ -259,7 +261,11 @@ body[data-sky="heat"] {
 }
 
 [data-theme="light"] aside {
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.98) 100%) !important;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.95) 0%,
+    rgba(241, 245, 249, 0.98) 100%
+  ) !important;
   border-right-color: rgba(15, 23, 42, 0.08) !important;
 }
 
