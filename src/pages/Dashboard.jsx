@@ -100,6 +100,12 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      <section className="space-y-2">
+        <p className="section-kicker">Overview</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Weather intelligence at a glance</h1>
+        <p className="max-w-3xl text-sm text-slate-400">Pin key cities, compare Kerala microclimates, and scan actionable daily signals in seconds.</p>
+      </section>
+
       <div className="grid gap-4 md:grid-cols-3">
         <Card title="Pinned cities" description="Add quick-access climate tiles">
           <div className="space-y-3">
@@ -135,9 +141,9 @@ const Dashboard = () => {
         </Card>
         <Card title="System status" description="MongoDB-backed API">
           <ul className="space-y-2 text-sm text-slate-200">
-            <li>Auth, weather, AQI, UV, alerts, favorites, feedback endpoints</li>
-            <li>Real WeatherAPI.com data with open-meteo fallback</li>
-            <li>Session managed server-side via MongoDB</li>
+            <li><span className="font-semibold text-slate-100">Coverage:</span> Auth, weather, AQI, UV, alerts, favorites, feedback.</li>
+            <li><span className="font-semibold text-slate-100">Data:</span> WeatherAPI live feed with open-meteo fallback.</li>
+            <li><span className="font-semibold text-slate-100">Sessions:</span> Persisted in MongoDB backend.</li>
           </ul>
         </Card>
         <Card title="Accessibility" description="Quick toggles">
@@ -150,7 +156,7 @@ const Dashboard = () => {
       <Card title="Kerala microclimates" description="Visual splits across coast, backwaters, and high-range hills">
         <div className="grid gap-3 md:grid-cols-2">
           {microclimates.map((mc) => (
-            <div key={mc.id} className="rounded-2xl border border-white/5 bg-slate-900/70 p-4 shadow-lg shadow-blue-950/40">
+            <div key={mc.id} className="rounded-2xl bg-slate-900/55 p-4 shadow-lg shadow-blue-950/30">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <p className="text-[11px] uppercase text-slate-400">{mc.zone || mc.region}</p>
@@ -175,7 +181,7 @@ const Dashboard = () => {
       <Card title="Daily Kerala signals" description="Plan quickly with visual cues instead of text blocks">
         <div className="grid gap-3 md:grid-cols-3">
           {keralaSignals.map((sig) => (
-            <div key={sig.title} className={`rounded-2xl border p-4 text-sm text-slate-200 ${sig.tone}`}>
+            <div key={sig.title} className={`rounded-2xl p-4 text-sm text-slate-200 ${sig.tone}`}>
               <div className="flex items-center gap-2 text-base font-semibold text-white">
                 <span>{sig.icon}</span>
                 <span>{sig.title}</span>

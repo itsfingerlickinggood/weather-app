@@ -16,7 +16,7 @@ import {
 import { useUI } from '../context/ui'
 
 const Stat = ({ label, value, tone = 'neutral' }) => (
-  <div className="rounded-xl border border-white/5 bg-slate-900/60 px-3 py-2">
+  <div className="panel-subtle px-3 py-2">
     <p className="text-xs uppercase text-slate-400">{label}</p>
     <p className={`text-lg font-semibold ${tone === 'warning' ? 'text-amber-200' : 'text-white'}`}>{value}</p>
   </div>
@@ -221,11 +221,14 @@ const LocationPage = () => {
 
   return (
     <div className="space-y-6">
+      <section className="space-y-1">
+        <p className="section-kicker">Location view</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">{locationData?.name}</h1>
+        <p className="text-sm text-slate-400">{locationData?.region} · Lat {locationData?.lat} / Lon {locationData?.lon}</p>
+      </section>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase text-slate-400">{locationData?.region}</p>
-          <h1 className="text-2xl font-semibold text-white">{locationData?.name}</h1>
-          <p className="text-sm text-slate-300">Lat {locationData?.lat} / Lon {locationData?.lon}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {locationData?.zone ? <Badge tone="neutral" label={locationData.zone} /> : null}
             {(locationData?.tags || []).map((tag) => (
@@ -249,8 +252,8 @@ const LocationPage = () => {
 
       <Card title="Current conditions" description="Real-time snapshot + cached fallback">
         <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-2">
-            <p className="text-4xl font-bold text-white">{weatherPayload?.temp}°C</p>
+          <div className="panel-subtle space-y-2">
+            <p className="metric-value text-white">{weatherPayload?.temp}°C</p>
             <p className="text-sm text-slate-300">{weatherPayload?.summary}</p>
             <p className="text-xs text-slate-400">Updated {new Date(weatherPayload?.currentTime).toLocaleTimeString()}</p>
           </div>

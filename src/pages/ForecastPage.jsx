@@ -28,6 +28,11 @@ const ForecastPage = () => {
 
   return (
     <div className="space-y-4">
+      <section className="space-y-1">
+        <p className="section-kicker">Forecast</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Plan the next 24 hours to 14 days</h1>
+      </section>
+
       <div className="flex items-center gap-3">
         <div className="w-full max-w-xs">
           <LocationSearch
@@ -49,13 +54,13 @@ const ForecastPage = () => {
             const payload = live || {}
             return (
               <div className="grid gap-3 md:grid-cols-3 text-sm text-slate-200">
-                <div className="space-y-1 rounded-xl border border-white/5 bg-slate-900/60 p-3">
+                <div className="panel-subtle space-y-1">
                   <p className="text-xs uppercase text-slate-400">Headline</p>
-                  <p className="text-3xl font-semibold text-white">{payload?.temp}°C</p>
+                  <p className="metric-value text-white">{payload?.temp}°C</p>
                   <p>{payload?.summary}</p>
                   <p className="text-[11px] text-slate-400">Feels like {payload?.feelsLike ?? payload?.temp}°C</p>
                 </div>
-                <div className="space-y-2 rounded-xl border border-white/5 bg-slate-900/60 p-3">
+                <div className="panel-subtle space-y-2">
                   <p className="text-xs uppercase text-slate-400">Vitals</p>
                   <div className="flex flex-wrap gap-3">
                     <span>AQI {payload?.aqi ?? '—'}</span>
@@ -64,7 +69,7 @@ const ForecastPage = () => {
                     <span>Wind {payload?.wind ?? '—'} km/h</span>
                   </div>
                 </div>
-                <div className="space-y-1 rounded-xl border border-white/5 bg-slate-900/60 p-3">
+                <div className="panel-subtle space-y-1">
                   <p className="text-xs uppercase text-slate-400">Sun</p>
                   <p>Sunrise {payload?.sunrise ? new Date(payload.sunrise).toLocaleTimeString() : '—'}</p>
                   <p>Sunset {payload?.sunset ? new Date(payload.sunset).toLocaleTimeString() : '—'}</p>
@@ -83,7 +88,7 @@ const ForecastPage = () => {
         ) : weather.error ? (
           <p className="text-sm text-red-300">Unable to load.</p>
         ) : (
-          <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3 text-sm text-slate-200">
+          <div className="panel-subtle text-sm text-slate-200">
             {hourlyHint || 'Hourly guidance not available'}
           </div>
         )}
