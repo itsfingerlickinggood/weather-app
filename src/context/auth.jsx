@@ -1,21 +1,27 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { configureApiAuth, readStoredTokens } from '../lib/api'
 import { getSession, loginLocal, logoutLocal, signupLocal } from '../lib/localAuth'
+import { getRemoteSession, loginRemote, logoutRemote, signupRemote } from '../lib/remoteAuth'
 
 const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
-  const autoLoginDemo = import.meta.env.VITE_AUTO_LOGIN_DEMO === 'true'
-  const [user, setUser] = useState(() => getSession())
+  const useRemoteAuth = import.meta.env.VITE_USE_REMOTE_AUTH === 'true' && !!import.meta.env.VITE_API_URL
+  const autoLoginDemo = !useRemoteAuth && import.meta.env.VITE_AUTO_LOGIN_DEMO === 'true'
+  const [user, setUser] = useState(() => useRemoteAuth ? getRemoteSession() : getSession())
   const [status, setStatus] = useState(() => (autoLoginDemo ? 'loading' : 'ready'))
   const [error, setError] = useState('')
   const autoFiredRef = useRef(false)
 
   const handleLogout = useCallback(() => {
-    logoutLocal()
-    localStorage.removeItem('awi_tokens')
+    if (useRemoteAuth) {
+      logoutRemote()
+    } else {
+      logoutLocal()
+      localStorage.removeItem('awi_tokens')
+    }
     setUser(null)
-  }, [])
+  }, [useRemoteAuth])
 
   useEffect(() => {
     configureApiAuth({
@@ -32,33 +38,53 @@ export const AuthProvider = ({ children }) => {
     })
   }, [handleLogout, user])
 
-  const login = useCallback((email, password) => {
-    setStatus('loading')
-    const found = loginLocal(email, password)
-    if (!found) {
-      setError('Account not found. Please sign up to continue.')
-      setStatus('ready')
-      return null
-    }
-    setError('')
-    setUser(found)
-    setStatus('ready')
-    return found
-  }, [])
+  const login = useCallback(
+    async (email, password) => {
+      setStatus('loading')
+      try {
+        const found = useRemoteAuth ? await loginRemote(email, password) : loginLocal(email, password)
+        if (!found) {
+          setError('Account not found. Please sign up to continue.')
+          setStatus('ready')
+          return null
+        }
+        setError('')
+        setUser(found)
+        setStatus('ready')
+        return found
+      } catch (err) {
+        const message = err?.response?.data?.error || err?.message || 'Login failed'
+        setError(message)
+        setStatus('ready')
+        return null
+      }
+    },
+    [useRemoteAuth],
+  )
 
-  const signup = useCallback((email, password) => {
-    setStatus('loading')
-    const created = signupLocal(email, password)
-    if (!created) {
-      setError('User already exists. Try logging in.')
-      setStatus('ready')
-      return null
-    }
-    setError('')
-    setUser(created)
-    setStatus('ready')
-    return created
-  }, [])
+  const signup = useCallback(
+    async (email, password) => {
+      setStatus('loading')
+      try {
+        const created = useRemoteAuth ? await signupRemote(email, password) : signupLocal(email, password)
+        if (!created) {
+          setError('User already exists. Try logging in.')
+          setStatus('ready')
+          return null
+        }
+        setError('')
+        setUser(created)
+        setStatus('ready')
+        return created
+      } catch (err) {
+        const message = err?.response?.data?.error || err?.message || 'Signup failed'
+        setError(message)
+        setStatus('ready')
+        return null
+      }
+    },
+    [useRemoteAuth],
+  )
 
   const value = useMemo(
     () => ({

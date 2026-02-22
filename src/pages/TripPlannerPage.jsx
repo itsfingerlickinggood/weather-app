@@ -8,8 +8,8 @@ const defaultTrips = [{ id: 'trip-1', locationId: 'tvm', label: 'Thiruvananthapu
 
 const packList = (forecast = []) => {
   const needsRain = forecast.some((d) => d.precip > 0.3)
-  const needsHeat = forecast.some((d) => d.high > 90)
-  const needsCold = forecast.some((d) => d.low < 55)
+  const needsHeat = forecast.some((d) => d.high > 32)
+  const needsCold = forecast.some((d) => d.low < 12)
   const items = ['Comfortable walking shoes', 'Reusable water bottle']
   if (needsRain) items.push('Light rain shell / umbrella')
   if (needsHeat) items.push('Sunscreen, hat, breathable layers')
@@ -22,7 +22,7 @@ const bestDay = (forecast = []) => {
   const scored = forecast.map((d) => {
     let score = 100
     score -= (d.precip || 0) * 80
-    if (d.high > 95 || d.low < 45) score -= 15
+    if (d.high > 36 || d.low < 8) score -= 15
     return { ...d, score }
   })
   return scored.sort((a, b) => b.score - a.score)[0]
@@ -34,8 +34,8 @@ const TripCard = ({ trip, location, onUpdate }) => {
   const fallback = !data
     ? Array.from({ length: trip.days }).map((_, idx) => ({
         day: new Date(Date.now() + idx * 86400000).toLocaleDateString('en-US', { weekday: 'short' }),
-        high: 78 + (idx % 3) * 2,
-        low: 64 + (idx % 2) * 2,
+        high: 28 + (idx % 3) * 2,
+        low: 22 + (idx % 2) * 2,
         precip: 0.2 + idx * 0.03,
       }))
     : null
@@ -43,7 +43,7 @@ const TripCard = ({ trip, location, onUpdate }) => {
   const best = bestDay(daysData)
   const pack = packList(daysData)
   const rainyDays = daysData.filter((d) => (d.precip || 0) > 0.3).length
-  const hotDays = daysData.filter((d) => (d.high || 0) > 92).length
+  const hotDays = daysData.filter((d) => (d.high || 0) > 34).length
 
   return (
     <Card title={location?.name || trip.label} description={`${trip.days} days`}>
@@ -60,12 +60,12 @@ const TripCard = ({ trip, location, onUpdate }) => {
             <div className="rounded-lg border border-white/5 bg-white/5 p-2">
               <p className="text-[11px] uppercase text-slate-400">Rainy days</p>
               <p className="text-lg font-semibold text-white">{rainyDays}</p>
-              <p className="text-[11px] text-slate-400">Carry shell/umbrella if >0</p>
+              <p className="text-[11px] text-slate-400">Carry shell/umbrella if &gt;0</p>
             </div>
             <div className="rounded-lg border border-white/5 bg-white/5 p-2">
               <p className="text-[11px] uppercase text-slate-400">Hot days</p>
               <p className="text-lg font-semibold text-white">{hotDays}</p>
-              <p className="text-[11px] text-slate-400">Plan shade breaks if >0</p>
+              <p className="text-[11px] text-slate-400">Plan shade breaks if &gt;0</p>
             </div>
             <div className="rounded-lg border border-white/5 bg-white/5 p-2">
               <p className="text-[11px] uppercase text-slate-400">Prep</p>
@@ -121,7 +121,7 @@ const TripCard = ({ trip, location, onUpdate }) => {
                 className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-1"
                 value={trip.budget || ''}
                 onChange={(e) => onUpdate?.(trip.id, { budget: Number(e.target.value) })}
-                placeholder="USD"
+                placeholder="e.g. 10000"
               />
             </label>
           </div>
@@ -233,7 +233,7 @@ const TripPlannerPage = () => {
               min="0"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
-              placeholder="USD"
+              placeholder="e.g. 10000"
             />
           </label>
         </div>

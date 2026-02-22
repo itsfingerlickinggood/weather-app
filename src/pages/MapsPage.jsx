@@ -4,6 +4,13 @@ import MapView from '../components/MapView'
 import { useLocations, useAlerts, useRisk, useHourly } from '../hooks/queries'
 import LocationSearch from '../components/LocationSearch'
 
+const seededRandom = (seed, idx = 0) => {
+  const s = `${seed}-${idx}`
+  let h = 0
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 1000000
+  return Math.abs(Math.sin(h)) % 1
+}
+
 const MapsPage = () => {
   const { data: locations = [] } = useLocations()
   const [selected, setSelected] = useState('tvm')
@@ -17,13 +24,6 @@ const MapsPage = () => {
     const loc = locations.find((l) => l.id === selected)
     return loc ? [loc.lon, loc.lat] : [77.5, 12.9]
   }, [locations, selected])
-
-  const seededRandom = (seed, idx = 0) => {
-    const s = `${seed}-${idx}`
-    let h = 0
-    for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 1000000
-    return Math.abs(Math.sin(h)) % 1
-  }
 
   const points = useMemo(() => {
     const loc = locations.find((l) => l.id === selected)
@@ -50,7 +50,7 @@ const MapsPage = () => {
       }
     })
     return synthetic
-  }, [alerts.data, hourly.data, hours, layer, locations, risk.data, selected])
+  }, [hourly.data, hours, layer, locations, selected])
 
   return (
     <div className="space-y-4">
@@ -133,7 +133,7 @@ const MapsPage = () => {
           </div>
           <div className="space-y-1">
             <p className="text-[11px] uppercase text-slate-400">Quick read</p>
-            <p>Alerts >0: watch advisory zones.</p>
+            <p>Alerts &gt;0: watch advisory zones.</p>
             <p>Risk ≥50: prepare a backup plan.</p>
             <p>Layer max → strongest hotspot on map.</p>
           </div>

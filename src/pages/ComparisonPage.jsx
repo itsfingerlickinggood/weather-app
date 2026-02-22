@@ -7,12 +7,12 @@ const ComparisonCard = ({ id, label }) => {
   const { data, isLoading } = useWeather(id)
   if (!id) return <div className="text-sm text-slate-400">Select a city</div>
   if (isLoading) return <Skeleton className="h-24" />
-  const payload = data?.data
+  const payload = data
   return (
     <div className="space-y-2 text-sm text-slate-200">
       <p className="text-lg font-semibold text-white">{label}</p>
       <div className="grid grid-cols-2 gap-2">
-        <span>Temp: {payload?.temp}°F</span>
+        <span>Temp: {payload?.temp}°C</span>
         <span>AQI: {payload?.aqi}</span>
         <span>UV: {payload?.uv}</span>
         <span>Humidity: {payload?.humidity}%</span>

@@ -1,7 +1,7 @@
 import Card from '../components/Card'
 import { useFavorites, useLocations, useWeather, useExtendedForecast } from '../hooks/queries'
 import LocationSearch from '../components/LocationSearch'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 
 const SavedCitiesPage = () => {
   const { favoritesQuery, addFavorite, removeFavorite } = useFavorites()
@@ -50,48 +50,10 @@ const SavedCitiesPage = () => {
 const SavedTile = ({ id, name, onRemove }) => {
   const { data, isLoading, error } = useWeather(id)
   const forecastQuery = useExtendedForecast(id)
-  const payload = data?.data
-  const seededRandom = (seed, offset = 0) => {
-    const s = `${seed}-${offset}`
-    let h = 0
-    for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 1000000
-    return Math.abs(Math.sin(h)) % 1
-  }
+  const payload = data
 
-  const fallbackCurrent = useMemo(() => {
-    const r = seededRandom(id)
-    return {
-      temp: Math.round(70 + r * 20),
-      feelsLike: Math.round(70 + r * 20 + 2),
-      summary: r > 0.6 ? 'Partly cloudy' : 'Clear',
-      aqi: Math.round(40 + r * 120),
-      uv: Math.round(2 + r * 8),
-      humidity: Math.round(50 + r * 40),
-      wind: Math.round(5 + r * 12),
-      precip: Math.round(r * 80),
-      currentTime: new Date().toISOString(),
-      sunrise: new Date().setHours(6, 10, 0, 0),
-      sunset: new Date().setHours(18, 45, 0, 0),
-    }
-  }, [id])
-
-  const fallbackForecast = useMemo(
-    () =>
-      Array.from({ length: 7 }).map((_, idx) => {
-        const r = seededRandom(id, idx + 1)
-        return {
-          day: new Date(Date.now() + idx * 86400000).toLocaleDateString('en-US', { weekday: 'short' }),
-          high: Math.round(75 + r * 18),
-          low: Math.round(60 + r * 12),
-          precip: Math.min(1, r * 0.9),
-          aqi: Math.round(40 + r * 120),
-        }
-      }),
-    [id],
-  )
-
-  const forecast7 = forecastQuery.data?.length ? forecastQuery.data.slice(0, 7) : fallbackForecast
-  const current = payload || fallbackCurrent
+  const forecast7 = forecastQuery.data?.length ? forecastQuery.data.slice(0, 7) : []
+  const current = payload || {}
 
   if (isLoading) return <div className="h-24 rounded-xl border border-white/5 bg-slate-900/60" />
   if (error) return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm">Unable to load {name}</div>
@@ -111,14 +73,14 @@ const SavedTile = ({ id, name, onRemove }) => {
       <div className="grid gap-2 md:grid-cols-2">
         <div className="space-y-1 rounded-lg border border-white/5 bg-white/5 p-2">
           <div className="flex items-center gap-3">
-            <span className="text-2xl font-semibold text-white">{current?.temp}°F</span>
-            <span className="text-xs text-slate-400">Feels {current?.feelsLike ?? current?.temp}°F</span>
+            <span className="text-2xl font-semibold text-white">{current?.temp}°C</span>
+            <span className="text-xs text-slate-400">Feels {current?.feelsLike ?? current?.temp}°C</span>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <span>AQI {current?.aqi}</span>
             <span>UV {current?.uv}</span>
             <span>Humidity {current?.humidity}%</span>
-            <span>Wind {current?.wind} mph</span>
+            <span>Wind {current?.wind} km/h</span>
             <span>Precip {current?.precip}%</span>
           </div>
           <p className="text-[11px] text-slate-400">

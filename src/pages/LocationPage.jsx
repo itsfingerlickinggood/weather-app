@@ -51,15 +51,15 @@ const selectSky = (payload, alerts = []) => {
   if (alerts.length) return 'storm'
   if (summary.includes('rain') || summary.includes('shower')) return 'rain'
   if (summary.includes('storm')) return 'storm'
-  if (payload.uv > 8 || payload.temp > 90) return 'heat'
+  if (payload.uv > 8 || payload.temp > 35) return 'heat'
   return 'clear'
 }
 
 const buildClothingAdvice = (payload) => {
   if (!payload) return []
   const advice = []
-  if (payload.temp >= 85) advice.push('Light fabrics and breathable layers recommended.')
-  if (payload.temp <= 55) advice.push('Add a warm layer or windbreaker.')
+  if (payload.temp >= 30) advice.push('Light fabrics and breathable layers recommended.')
+  if (payload.temp <= 13) advice.push('Add a warm layer or windbreaker.')
   if (payload.precip > 0.15) advice.push('Carry a waterproof shell or umbrella.')
   if (payload.uv >= 7) advice.push('Use sunscreen, hat, and UV sunglasses.')
   if (payload.aqi > 120) advice.push('Mask advised for sensitive groups (AQI elevated).')
@@ -80,7 +80,7 @@ const buildActivityAdvice = (payload, profile = 'general') => {
   if (payload.aqi > 120) score -= 2 * weight.aqi
   if (payload.uv > 8) score -= 1 * weight.uv
   if (payload.precip > 0.25) score -= 2 * weight.precip
-  if (payload.temp < 40 || payload.temp > 95) score -= 1 * weight.temp
+  if (payload.temp < 5 || payload.temp > 35) score -= 1 * weight.temp
   const clamped = Math.max(1, Math.min(5, Math.round(score)))
   const suggestions = []
   if (clamped >= 4) suggestions.push('Great for running, cycling, and outdoor sports.')
@@ -109,9 +109,10 @@ const buildSafetyStatus = (payload, risk) => {
   if (payload.aqi > 150) score -= 30
   if (payload.uv > 8) score -= 20
   if (payload.precip > 0.35) score -= 20
-  if (payload.wind > 25) score -= 10
-  if ((risk?.score || 0) > 50) score -= 15
-  if ((risk?.score || 0) > 70) score -= 20
+  if (payload.wind > 40) score -= 10
+  const riskScore = risk ? Math.round(((risk.flood || 0) + (risk.heat || 0) + (risk.wind || 0) + (risk.aqi || 0)) / 4 * 100) : 0
+  if (riskScore > 50) score -= 15
+  if (riskScore > 70) score -= 20
 
   if (score >= 80) return { label: 'Safe to go outside', tone: 'success', detail: 'Great conditions for most activities.' }
   if (score >= 60) return { label: 'Caution advised', tone: 'warning', detail: 'Stay hydrated and watch UV/AQI if sensitive.' }
@@ -216,7 +217,7 @@ const LocationPage = () => {
   const rainStreak = weatherPayload?.rainStreakDays ?? 0
   const seaTemp = weatherPayload?.seaTemp
   const feelsLike = weatherPayload?.feelsLike ?? weatherPayload?.temp
-  const seaMeter = seaTemp ? Math.min(100, Math.max(0, seaTemp - 60)) : 0
+  const seaMeter = seaTemp ? Math.min(100, Math.max(0, (seaTemp - 20) * 5)) : 0
 
   return (
     <div className="space-y-6">
@@ -249,7 +250,7 @@ const LocationPage = () => {
       <Card title="Current conditions" description="Real-time snapshot + cached fallback">
         <div className="grid gap-3 md:grid-cols-3">
           <div className="space-y-2">
-            <p className="text-4xl font-bold text-white">{weatherPayload?.temp}°F</p>
+            <p className="text-4xl font-bold text-white">{weatherPayload?.temp}°C</p>
             <p className="text-sm text-slate-300">{weatherPayload?.summary}</p>
             <p className="text-xs text-slate-400">Updated {new Date(weatherPayload?.currentTime).toLocaleTimeString()}</p>
           </div>
@@ -258,7 +259,7 @@ const LocationPage = () => {
             <Stat label="UV" value={weatherPayload?.uv} tone={weatherPayload?.uv > 7 ? 'warning' : 'neutral'} />
           </div>
           <div className="space-y-2">
-            <Stat label="Wind" value={`${weatherPayload?.wind} mph`} />
+            <Stat label="Wind" value={`${weatherPayload?.wind} km/h`} />
             <Stat label="Humidity" value={`${weatherPayload?.humidity}%`} />
           </div>
         </div>
@@ -269,10 +270,10 @@ const LocationPage = () => {
         <div className="flex flex-col gap-2 rounded-xl border border-white/5 bg-slate-900/60 p-3 text-sm text-slate-200">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={safety.tone} label={safety.label} />
-            {riskQuery.isLoading ? <span className="text-xs text-slate-400">Loading risk…</span> : <span className="text-xs text-slate-400">Risk score {riskQuery.data?.score ?? '—'}</span>}
+            {riskQuery.isLoading ? <span className="text-xs text-slate-400">Loading risk…</span> : <span className="text-xs text-slate-400">Risk score {riskQuery.data ? Math.round(((riskQuery.data.flood || 0) + (riskQuery.data.heat || 0) + (riskQuery.data.wind || 0) + (riskQuery.data.aqi || 0)) / 4 * 100) : '—'}/100</span>}
           </div>
           <p className="text-slate-300">{safety.detail}</p>
-          <p className="text-[11px] text-slate-400">Factors: AQI {weatherPayload?.aqi}, UV {weatherPayload?.uv}, precip {Math.round((weatherPayload?.precip || 0) * 100)}%, wind {weatherPayload?.wind} mph.</p>
+          <p className="text-[11px] text-slate-400">Factors: AQI {weatherPayload?.aqi}, UV {weatherPayload?.uv}, precip {Math.round((weatherPayload?.precip || 0) * 100)}%, wind {weatherPayload?.wind} km/h.</p>
         </div>
       </Card>
 
@@ -280,8 +281,8 @@ const LocationPage = () => {
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4">
             <p className="text-[11px] uppercase text-slate-400">Thermal feel</p>
-            <p className="text-3xl font-semibold text-white">{feelsLike}°F</p>
-            <p className="text-xs text-slate-400">Actual {weatherPayload?.temp}°F • Feels driven by humidity</p>
+              <p className="text-3xl font-semibold text-white">{feelsLike}°C</p>
+            <p className="text-xs text-slate-400">Actual {weatherPayload?.temp}°C • Feels driven by humidity</p>
             <div className="mt-3 space-y-2">
               <VisualMeter label="Comfort index" value={comfortIndex} suffix="/100" gradient="from-amber-300 to-pink-400" />
               <VisualMeter label="Humidity" value={weatherPayload?.humidity ?? 0} />
@@ -304,8 +305,8 @@ const LocationPage = () => {
               <p className="flex items-center gap-2"><span>🌇</span><span>Sunset {formatClock(weatherPayload?.sunset)}</span></p>
               <VisualMeter label="Sea warmth" value={seaMeter} suffix="%" gradient="from-cyan-300 to-blue-400" />
               <div className="flex flex-wrap gap-2 text-[11px] text-slate-100">
-                {seaTemp ? <span className="rounded-full bg-white/10 px-2 py-1">Sea {seaTemp}°F</span> : null}
-                {weatherPayload?.dewPoint ? <span className="rounded-full bg-white/10 px-2 py-1">Dew {weatherPayload.dewPoint}°F</span> : null}
+                {seaTemp ? <span className="rounded-full bg-white/10 px-2 py-1">Sea {seaTemp}°C</span> : null}
+                {weatherPayload?.dewPoint ? <span className="rounded-full bg-white/10 px-2 py-1">Dew {weatherPayload.dewPoint}°C</span> : null}
                 {weatherPayload?.visibility ? <span className="rounded-full bg-white/10 px-2 py-1">{weatherPayload.visibility} km vis</span> : null}
               </div>
             </div>
@@ -314,32 +315,30 @@ const LocationPage = () => {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card title="Next hours" description="Hourly temp + AQI">
+        <Card title="Next hours" description="Hourly temp + rain chance">
           {hourlyQuery.isLoading ? (
             <Skeleton className="h-24" />
           ) : (
             <div role="list" className="grid grid-cols-3 gap-2 text-sm">
-              {hourlyQuery.data?.map((h) => (
+              {(hourlyQuery.data || []).slice(0, 9).map((h) => (
                 <div key={h.hour} role="listitem" className="rounded-xl border border-white/5 bg-slate-900/50 p-3">
                   <p className="text-xs text-slate-400">+{h.hour}h</p>
-                  <p className="font-semibold text-white">{h.temp}°F</p>
-                  <p className="text-xs text-slate-400">AQI {h.aqi}</p>
-                  <p className="text-[11px] text-emerald-200">Precip {Math.round((h.precip || 0) * 100)}%</p>
+                  <p className="font-semibold text-white">{h.temp}\u00b0C</p>
+                  <p className="text-[11px] text-slate-400">Rain {Math.round((h.precip || 0) * 100)}%</p>
                 </div>
               ))}
             </div>
           )}
         </Card>
-
-        <Card title="3-day forecast" description="High / Low / Precip">
+        <Card title="Next 3 days" description="High / Low / Precip">
           {forecastQuery.isLoading ? (
             <Skeleton className="h-24" />
           ) : (
             <div className="divide-y divide-white/5 text-sm">
-              {forecastQuery.data?.map((day) => (
+              {(forecastQuery.data || []).map((day) => (
                 <div key={day.day} className="flex items-center justify-between py-2">
                   <span className="text-slate-200">{day.day}</span>
-                  <span className="text-slate-300">{day.high}° / {day.low}°</span>
+                  <span className="text-slate-300">{day.high}\u00b0 / {day.low}\u00b0</span>
                   <span className="text-amber-200">{Math.round(day.precip * 100)}% precip</span>
                 </div>
               ))}
@@ -395,8 +394,17 @@ const LocationPage = () => {
             <Skeleton className="h-20" />
           ) : (
             <div className="space-y-2 text-sm text-slate-200">
-              <p className="text-lg font-semibold text-white">Score {riskQuery.data?.score}/100</p>
-              <p className="text-slate-300">Key threats: {riskQuery.data?.threats?.join(', ') || 'None'}</p>
+              <p className="text-lg font-semibold text-white">Score {riskQuery.data ? Math.round(((riskQuery.data.flood || 0) + (riskQuery.data.heat || 0) + (riskQuery.data.wind || 0) + (riskQuery.data.aqi || 0)) / 4 * 100) : '—'}/100</p>
+              <div className="grid grid-cols-2 gap-1 text-xs text-slate-300">
+                {riskQuery.data ? [
+                  ['Flood', riskQuery.data.flood],
+                  ['Heat', riskQuery.data.heat],
+                  ['Wind', riskQuery.data.wind],
+                  ['AQI', riskQuery.data.aqi],
+                ].map(([label, val]) => (
+                  <span key={label}>{label}: {val != null ? Math.round(val * 100) : '—'}%</span>
+                )) : null}
+              </div>
             </div>
           )}
         </Card>
@@ -480,9 +488,8 @@ const LocationPage = () => {
             {bestHours(hourlyQuery.data || []).map((h) => (
               <div key={h.hour} className="rounded-xl border border-white/5 bg-slate-900/60 p-3 text-sm text-slate-200">
                 <p className="text-xs text-slate-400">+{h.hour}h</p>
-                <p className="font-semibold text-white">{h.temp}°F</p>
-                <p className="text-[11px] text-slate-400">AQI {h.aqi}</p>
-                <p className="text-[11px] text-emerald-200">Precip {Math.round((h.precip || 0) * 100)}%</p>
+                <p className="font-semibold text-white">{h.temp}°C</p>
+                <p className="text-[11px] text-emerald-200">Rain {Math.round((h.precip || 0) * 100)}%</p>
               </div>
             ))}
           </div>

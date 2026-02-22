@@ -55,7 +55,7 @@ const AdminFeedbackPage = () => {
               <li key={item.id} className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">{item.userId}</span>
+                      <span className="font-semibold">{item.userEmail || item.userId || 'Unknown'}</span>
                       <Badge {...sentimentFromMessage(item.message)} />
                       <Badge tone={item.status === 'resolved' ? 'success' : item.status === 'ack' ? 'neutral' : 'warning'} label={item.status || 'open'} />
                     </div>

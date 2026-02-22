@@ -4,17 +4,18 @@ import { useAuth } from '../context/auth'
 import Card from '../components/Card'
 
 const DEMO_USERS = [
-  { label: 'Login as User', email: 'user@example.com', password: 'password' },
-  { label: 'Login as Admin', email: 'admin@example.com', password: 'password' },
+  { label: 'Login as User', email: 'user@example.com', password: import.meta.env.VITE_DEMO_USER_PASSWORD || 'changeme' },
+  { label: 'Login as Admin', email: 'admin@example.com', password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'changeme' },
 ]
 
 const LoginPage = () => {
   const { login, signup, loading, error } = useAuth()
+  const isRemoteAuth = import.meta.env.VITE_USE_REMOTE_AUTH === 'true'
   const navigate = useNavigate()
   const location = useLocation()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('user@example.com')
-  const [password, setPassword] = useState('password')
+  const [password, setPassword] = useState('')
   const [localError, setLocalError] = useState('')
 
   const redirect = () => {
@@ -36,7 +37,10 @@ const LoginPage = () => {
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6">
-      <Card title="Sign in to your weather" description="Local-only auth. No external services.">
+      <Card
+        title="Sign in to your weather"
+        description={isRemoteAuth ? 'Secure server-backed auth via MongoDB.' : 'Local-only auth. No external services.'}
+      >
         <div className="flex gap-2 text-sm">
           <button
             type="button"
@@ -71,7 +75,9 @@ const LoginPage = () => {
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-400">All stored locally; no network calls.</p>
+        <p className="text-xs text-slate-400">
+          {isRemoteAuth ? 'Accounts stored in MongoDB.' : 'All stored locally; no network calls.'}
+        </p>
 
         <form className="space-y-4" onSubmit={handleAuth}>
           <label className="block text-sm">
@@ -105,11 +111,11 @@ const LoginPage = () => {
           >
             {loading ? 'Working…' : mode === 'login' ? 'Login' : 'Create account'}
           </button>
-          <p className="text-xs text-slate-400">Demo: user@example.com / password</p>
+          <p className="text-xs text-slate-400">Demo: user@example.com / changeme</p>
         </form>
       </Card>
       <div className="text-center text-xs text-slate-500">
-        Local-only auth for demo; delete data in Settings to reset.
+        {isRemoteAuth ? 'Server-backed auth is enabled.' : 'Local-only auth for demo; delete data in Settings to reset.'}
       </div>
       <div className="text-center text-xs text-slate-500">
         <Link className="text-blue-200 underline" to="/">

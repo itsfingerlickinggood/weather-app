@@ -25,10 +25,9 @@ const AdminUsagePage = () => {
   const storyRulesQuery = useAdminStoryRules()
   const radarSettingsQuery = useAdminRadarSettings()
   const thresholdsQuery = useDisasterThresholds()
-  const [view, setView] = useState('daily')
   const [apiConfigDraft, setApiConfigDraft] = useState({ primary: '', backup: '', primaryKey: '', backupKey: '' })
   const [radarDraft, setRadarDraft] = useState({ layer: 'precip', intervalMinutes: 5 })
-  const [thresholdDraft, setThresholdDraft] = useState({ flood: 70, heat: 95, wind: 60, aqi: 150 })
+  const [thresholdDraft, setThresholdDraft] = useState({ flood: 70, heat: 35, wind: 60, aqi: 150 })
   const [ruleDraft, setRuleDraft] = useState({ name: '', condition: '', template: '' })
 
   const saveApiConfig = useMutation({
@@ -68,7 +67,7 @@ const AdminUsagePage = () => {
 
   return (
     <div className="space-y-4">
-      <Card title="Usage" description="Mocked platform telemetry">
+      <Card title="Usage" description="Live platform telemetry">
         {usageQuery.isLoading ? (
           <Skeleton className="h-24" />
         ) : usageQuery.error ? (
@@ -97,39 +96,32 @@ const AdminUsagePage = () => {
               <p className="text-[11px] text-slate-400">Resets in {usageQuery.data?.rateLimit?.resetInMinutes}m</p>
             </div>
             <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-              <p className="text-xs uppercase text-slate-400">Peak usage</p>
-              <p className="text-lg font-semibold text-white">{usageQuery.data?.peakUsage}</p>
-              <p className="text-[11px] text-slate-400">Top searches: {(usageQuery.data?.mostSearched || []).join(', ')}</p>
+              <p className="text-xs uppercase text-slate-400">Feedback</p>
+              <p className="text-lg font-semibold text-white">{usageQuery.data?.feedbackCount ?? '—'}</p>
+              <p className="text-[11px] text-slate-400">Open: {usageQuery.data?.openFeedback ?? '—'}</p>
             </div>
           </div>
         )}
       </Card>
 
-      <Card title="Analytics window" description="Daily / weekly / monthly rollups">
+      <Card title="Analytics window" description="Feedback activity — last 7 days">
         {usageQuery.isLoading ? (
           <Skeleton className="h-20" />
         ) : (
           <div className="space-y-3 text-sm text-slate-200">
-            <div className="flex flex-wrap gap-2 text-xs">
-              {['daily', 'weekly', 'monthly'].map((v) => (
-                <button key={v} className={`focus-ring rounded-full px-3 py-1 ${view === v ? 'bg-blue-500 text-white' : 'bg-white/10 text-slate-100'}`} onClick={() => setView(v)}>
-                  {v}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-                <p className="text-xs uppercase text-slate-400">Users</p>
-                <p className="text-lg font-semibold text-white">{usageQuery.data?.views?.[view]?.users}</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-                <p className="text-xs uppercase text-slate-400">Requests</p>
-                <p className="text-lg font-semibold text-white">{usageQuery.data?.views?.[view]?.requests}</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-                <p className="text-xs uppercase text-slate-400">Errors</p>
-                <p className="text-lg font-semibold text-white">{usageQuery.data?.views?.[view]?.errors}</p>
-              </div>
+            <div className="space-y-2">
+              {(usageQuery.data?.daily || []).map((d) => {
+                const max = Math.max(...(usageQuery.data?.daily || []).map((x) => x.feedbackCount), 1)
+                return (
+                  <div key={d.date} className="flex items-center gap-3">
+                    <span className="w-8 text-right text-[11px] text-slate-400">{d.day}</span>
+                    <div className="h-3 flex-1 overflow-hidden rounded-full bg-white/5">
+                      <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${(d.feedbackCount / max) * 100}%` }} />
+                    </div>
+                    <span className="w-6 text-right text-[11px] text-white">{d.feedbackCount}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -187,7 +179,7 @@ const AdminUsagePage = () => {
           <div className="space-y-3 text-sm text-slate-200">
             <div className="grid gap-2 md:grid-cols-3">
               <input className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2" placeholder="Name" value={ruleDraft.name} onChange={(e) => setRuleDraft((prev) => ({ ...prev, name: e.target.value }))} />
-              <input className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2" placeholder="Condition (e.g., temp > 95)" value={ruleDraft.condition} onChange={(e) => setRuleDraft((prev) => ({ ...prev, condition: e.target.value }))} />
+              <input className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2" placeholder="Condition (e.g., temp > 35)" value={ruleDraft.condition} onChange={(e) => setRuleDraft((prev) => ({ ...prev, condition: e.target.value }))} />
               <input className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2" placeholder="Template text" value={ruleDraft.template} onChange={(e) => setRuleDraft((prev) => ({ ...prev, template: e.target.value }))} />
             </div>
             <button className="focus-ring rounded-xl bg-blue-500 px-3 py-2 text-white disabled:opacity-60" onClick={() => saveRule.mutate()} disabled={saveRule.isPending || !ruleDraft.name}>

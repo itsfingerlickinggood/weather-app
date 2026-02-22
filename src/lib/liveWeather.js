@@ -43,19 +43,17 @@ const safeNumber = (value, fallback = null) => {
   return Number.isFinite(num) ? num : fallback
 }
 
-const toFahrenheit = (tempC) => (tempC == null ? null : Math.round((tempC * 9) / 5 + 32))
-
 const normalizeTemp = (value) => {
   const num = safeNumber(value, null)
   if (num == null) return null
-  if (num > 65) return Math.round(num)
-  return toFahrenheit(num)
+  // WeatherAPI returns temp_c; open-meteo returns Celsius too – just round
+  return Math.round(num)
 }
 
-const kmhToMph = (kmh) => {
+const normalizeWind = (kmh) => {
   const num = safeNumber(kmh, null)
   if (num == null) return null
-  return Math.round(num * 0.621371)
+  return Math.round(num)
 }
 
 const summarize = (code) => weatherCodeSummary[code] || 'Weather update'
@@ -96,7 +94,7 @@ const mapWeatherApi = (payload) => {
     aqi: safeNumber(current.air_quality?.['us-epa-index'] ?? current.air_quality?.pm2_5, 0),
     uv: safeNumber(current.uv, 0),
     humidity: safeNumber(current.humidity, null),
-    wind: safeNumber(current.wind_kph, null) ? kmhToMph(current.wind_kph) : safeNumber(current.wind_mph, null),
+    wind: safeNumber(current.wind_kph, null) ?? safeNumber(current.wind_mph, null),
     precip: safeNumber(current.precip_mm, 0),
     currentTime: current.last_updated_epoch ? new Date(current.last_updated_epoch * 1000).toISOString() : new Date().toISOString(),
     hourly,
@@ -164,7 +162,7 @@ const mapOpenMeteo = (payload) => {
     aqi: safeNumber(current.european_aqi ?? current.us_aqi ?? current.pm2_5, 0),
     uv: safeNumber(current.uv_index, 0),
     humidity: safeNumber(current.relative_humidity_2m, null),
-    wind: kmhToMph(current.wind_speed_10m),
+    wind: normalizeWind(current.wind_speed_10m),
     precip: safeNumber(current.precipitation, 0),
     currentTime,
     hourly: buildHourlyFromOpenMeteo(hourly),
@@ -174,16 +172,15 @@ const mapOpenMeteo = (payload) => {
 }
 
 const fallbackForecast = () => [
-  { day: 'Day 1', high: 75, low: 62, precip: 0.2 },
-  { day: 'Day 2', high: 73, low: 61, precip: 0.1 },
-  { day: 'Day 3', high: 70, low: 59, precip: 0.05 },
+  { day: 'Day 1', high: 30, low: 24, precip: 0.2 },
+  { day: 'Day 2', high: 29, low: 23, precip: 0.1 },
+  { day: 'Day 3', high: 28, low: 22, precip: 0.05 },
 ]
 
 const fallbackHourly = () =>
   Array.from({ length: 6 }).map((_, idx) => ({
     hour: idx + 1,
-    temp: 70 + idx,
-    aqi: 40 + idx,
+    temp: 28 + idx,
     uv: Math.max(0, 4 - idx * 0.5),
     precip: Math.max(0, 0.05 * idx),
   }))
@@ -194,7 +191,7 @@ const mapIndian = (payload) => {
   const summary = root.summary || root.condition || root.description || 'Weather update'
   const temp = normalizeTemp(root.temperature ?? root.temp ?? root.temperature_c ?? root.temp_c)
   const humidity = safeNumber(root.humidity ?? root.rh, null)
-  const wind = safeNumber(root.wind_speed ?? root.wind_kph ?? root.wind_mph, null)
+  const wind = safeNumber(root.wind_speed ?? root.wind_kph, null) ?? safeNumber(root.wind_mph, null)
   const precip = safeNumber(root.precipitation ?? root.rain ?? root.precip_mm, null)
   const uv = safeNumber(root.uv_index ?? root.uv, null)
   const aqi = safeNumber(root.aqi ?? root.air_quality_index, null)

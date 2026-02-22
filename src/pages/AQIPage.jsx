@@ -5,13 +5,6 @@ import Skeleton from '../components/Skeleton'
 import { useLocations, useWeather } from '../hooks/queries'
 import LocationSearch from '../components/LocationSearch'
 
-const seededRandom = (seed) => {
-  let h = 0
-  const s = String(seed || 'aqi')
-  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 1000000
-  return Math.abs(Math.sin(h)) % 1
-}
-
 const categorize = (aqi) => {
   if (aqi == null) return { label: 'Unknown', tip: 'AQI unavailable', tone: 'neutral' }
   if (aqi <= 50) return { label: 'Good', tip: 'Air quality is good for everyone.', tone: 'success' }
@@ -24,7 +17,7 @@ const AQIPage = () => {
   const { data: locations = [] } = useLocations()
   const [selected, setSelected] = useState('tvm')
   const { data, isLoading } = useWeather(selected)
-  const payload = data?.data || { aqi: Math.round(40 + seededRandom(selected) * 120) }
+  const payload = data || { aqi: null }
   const meta = categorize(payload?.aqi)
 
   return (
@@ -62,8 +55,8 @@ const AQIPage = () => {
               <div className="rounded-lg border border-white/5 bg-white/5 p-2">
                 <p className="text-[11px] uppercase text-slate-400">Protective steps</p>
                 <ul className="list-disc space-y-1 pl-4">
-                  <li>Limit intense outdoor activity if AQI > 100.</li>
-                  <li>Use an N95 if AQI > 150 and sensitive.</li>
+                  <li>Limit intense outdoor activity if AQI &gt; 100.</li>
+                  <li>Use an N95 if AQI &gt; 150 and sensitive.</li>
                   <li>Close windows; run filtration if available.</li>
                 </ul>
               </div>

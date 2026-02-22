@@ -26,7 +26,8 @@ const CityWeatherCard = ({ id, name, onRemove }) => {
   if (isLoading) return <Skeleton className="h-32" />
   if (error) return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm">{error.message}</div>
 
-  const { data: payload, offline } = data || {}
+  const payload = data
+  const offline = data?.offline
   return (
     <div className="card-surface space-y-2 p-4">
       <div className="flex items-center justify-between">
@@ -39,7 +40,7 @@ const CityWeatherCard = ({ id, name, onRemove }) => {
         </button>
       </div>
       <div className="flex flex-wrap gap-4 text-sm text-slate-200">
-        <span>{payload?.temp}°F</span>
+        <span>{payload?.temp}°C</span>
         <span>AQI {payload?.aqi}</span>
         <span>UV {payload?.uv}</span>
         <span>Humidity {payload?.humidity}%</span>
@@ -92,7 +93,7 @@ const Dashboard = () => {
     () => [
       { title: 'Monsoon pulse active', detail: 'Evening showers along the coast; carry light shell.', tone: 'bg-blue-500/15 border-blue-400/30', icon: '🌧️' },
       { title: 'Backwater humidity', detail: 'High moisture boosts heat index near canals.', tone: 'bg-emerald-500/15 border-emerald-400/30', icon: '🛶' },
-      { title: 'Hill escapes cooler', detail: 'Idukki & Wayanad sitting ~10°F cooler with mist.', tone: 'bg-purple-500/15 border-purple-400/30', icon: '⛰️' },
+      { title: 'Hill escapes cooler', detail: 'Idukki & Wayanad sitting ~6°C cooler with mist.', tone: 'bg-purple-500/15 border-purple-400/30', icon: '⛰️' },
     ],
     [],
   )
@@ -132,11 +133,11 @@ const Dashboard = () => {
             <p className="text-xs text-slate-400">Pins are stored locally.</p>
           </div>
         </Card>
-        <Card title="System status" description="Mocked API via MSW">
+        <Card title="System status" description="MongoDB-backed API">
           <ul className="space-y-2 text-sm text-slate-200">
             <li>Auth, weather, AQI, UV, alerts, favorites, feedback endpoints</li>
-            <li>Token refresh handled client-side</li>
-            <li>Last refresh tokens stored in memory + localStorage</li>
+            <li>Real WeatherAPI.com data with open-meteo fallback</li>
+            <li>Session managed server-side via MongoDB</li>
           </ul>
         </Card>
         <Card title="Accessibility" description="Quick toggles">

@@ -12,9 +12,9 @@ const TopBar = () => {
   const weatherQuery = useWeather(defaultLoc)
 
   const summary = useMemo(() => {
-    const payload = weatherQuery.data?.data
+    const payload = weatherQuery.data
     if (!payload) return null
-    return `${payload.temp}° · ${payload.summary}`
+    return `${payload.temp}°C · ${payload.summary}`
   }, [weatherQuery.data])
 
   return (

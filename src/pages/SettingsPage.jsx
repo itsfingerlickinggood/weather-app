@@ -1,15 +1,18 @@
 import Card from '../components/Card'
 import { useUI } from '../context/ui'
 import { useAuth } from '../context/auth'
-import { USERS_KEY, SESSION_KEY } from '../localUsers'
+
+const APP_STORAGE_KEYS = [
+  'awi_ui', 'awi_pinned_cities', 'awi_tokens',
+  'awi_local_users', 'awi_local_session', 'favorites-local',
+]
 
 const SettingsPage = () => {
   const { theme, toggleTheme, reduceMotion, toggleMotion, highContrast, toggleContrast } = useUI()
   const { logout } = useAuth()
 
-  const clearLocalAccounts = () => {
-    localStorage.removeItem(USERS_KEY)
-    localStorage.removeItem(SESSION_KEY)
+  const clearSession = () => {
+    APP_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k))
     logout()
   }
 
@@ -38,11 +41,11 @@ const SettingsPage = () => {
           <button className="focus-ring rounded-full bg-white/5 px-3 py-2" onClick={logout}>
             Logout
           </button>
-          <button className="focus-ring rounded-full bg-red-500/20 px-3 py-2 text-red-100" onClick={clearLocalAccounts}>
-            Delete local account data
+          <button className="focus-ring rounded-full bg-red-500/20 px-3 py-2 text-red-100" onClick={clearSession}>
+            Sign out and clear session
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-400">All data is stored locally in your browser.</p>
+        <p className="mt-2 text-xs text-slate-400">Session managed by MongoDB backend. Your preferences are stored in this browser.</p>
       </Card>
     </div>
   )

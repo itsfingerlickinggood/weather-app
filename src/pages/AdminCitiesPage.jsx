@@ -16,6 +16,7 @@ const AdminCitiesPage = () => {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = { ...form, lat: Number(form.lat), lon: Number(form.lon) }
+      if (!editing && !payload.id) delete payload.id   // don't send empty id on create
       if (editing) return (await api.put(`/admin/locations/${editing}`, payload)).data
       return (await api.post('/admin/locations', payload)).data
     },
@@ -32,7 +33,7 @@ const AdminCitiesPage = () => {
   })
   return (
     <div className="space-y-4">
-      <Card title="Cities" description="CRUD stubbed via MSW">
+      <Card title="Cities" description="Manage locations in MongoDB">
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-5 text-sm text-slate-200">
             <input className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2" placeholder="ID (optional)" value={form.id} onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))} />
