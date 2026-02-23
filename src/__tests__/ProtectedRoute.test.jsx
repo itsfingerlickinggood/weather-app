@@ -8,7 +8,7 @@ import { UIProvider } from '../context/ui'
 
 describe('ProtectedRoute', () => {
   const renderWithProviders = () => {
-    const client = new QueryClient()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } })
     return render(
       <QueryClientProvider client={client}>
         <UIProvider>

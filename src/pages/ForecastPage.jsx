@@ -1,269 +1,115 @@
+import { useMemo, useState } from 'react'
 import Card from '../components/Card'
 import Skeleton from '../components/Skeleton'
-import { useLocations, useWeather, useForecast, useExtendedForecast, useHourly } from '../hooks/queries'
-import { useMemo, useState } from 'react'
+import { useLocations, useWeather, useForecast, useExtendedForecast } from '../hooks/queries'
 import LocationSearch from '../components/LocationSearch'
-
-const graphStyle = { width: '100%', height: '140px' }
+import { resolveWeatherIcon } from '../lib/weatherIcons'
 
 const ForecastPage = () => {
   const { data: locations = [] } = useLocations()
   const [selected, setSelected] = useState('tvm')
-  const [hover14, setHover14] = useState('')
+  const [hover14, setHover14] = useState(null)
   const weather = useWeather(selected)
   const forecast = useForecast(selected)
   const extended = useExtendedForecast(selected)
-  const hourly = useHourly(selected)
 
-  const hourlyHint = useMemo(() => {
-    const temp = weather.data?.temp
-    const humidity = weather.data?.humidity
-    const uv = weather.data?.uv
-    const parts = []
-    if (temp != null) parts.push(temp > 35 ? 'Heat spike' : temp < 15 ? 'Cool air' : 'Comfortable')
-    if (humidity != null) parts.push(`Humidity ${humidity}%`)
-    if (uv != null) parts.push(`UV ${uv}`)
-    return parts.join(' • ')
+  const shortLanguage = useMemo(() => {
+    const payload = weather.data
+    if (!payload) return 'Guidance unavailable'
+    if ((payload.precip || 0) > 0.35) return 'Rain-prone day. Keep a light shell handy.'
+    if ((payload.humidity || 0) > 82) return 'Muggy afternoon likely. Hydrate and pace activity.'
+    if ((payload.temp || 0) > 34) return 'Heat risk after noon. Favor shaded windows.'
+    return 'Best outdoor window 6–9 AM.'
   }, [weather.data])
 
   return (
     <div className="space-y-4">
       <section className="space-y-1">
         <p className="section-kicker">Forecast</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Plan the next 24 hours to 14 days</h1>
+        <h1 className="type-display tracking-tight text-slate-50">Plan from now to 14 days</h1>
       </section>
 
-      <div className="flex items-center gap-3">
-        <div className="w-full max-w-xs">
-          <LocationSearch
-            locations={locations}
-            value={selected}
-            onChange={setSelected}
-            label="City"
-            placeholder="Type to search city"
-          />
-        </div>
+      <div className="w-full max-w-xs">
+        <LocationSearch
+          locations={locations}
+          value={selected}
+          onChange={setSelected}
+          label="City"
+          placeholder="Type to search city"
+        />
       </div>
 
-      <Card title="Now" description="Current snapshot + key vitals">
+      <Card title="Now" description="Current snapshot and concise guidance">
         {weather.isLoading ? (
           <Skeleton className="h-24" />
         ) : (
           (() => {
-            const live = weather.data
-            const payload = live || {}
+            const payload = weather.data || {}
+            const icon = resolveWeatherIcon({
+              summary: payload.summary,
+              weathercode: payload.weathercode,
+              precip: payload.precip,
+              cloudCover: payload.cloudCover,
+              wind: payload.wind,
+              uv: payload.uv,
+              temp: payload.temp,
+            })
+
+            const isNum = (value) => typeof value === 'number' && Number.isFinite(value)
+            const oneDec = (value) => (isNum(value) ? value.toFixed(1) : '—')
+            const zeroDec = (value) => (isNum(value) ? Math.round(value) : '—')
+
+            const metricItems = [
+              { label: 'Feels like', value: `${oneDec(payload.feelsLike ?? payload.temp)}°C`, iconSrc: '/icons/weather/sunny.png' },
+              { label: 'Humidity', value: `${zeroDec(payload.humidity)}%`, iconSrc: '/icons/weather/cloud.png' },
+              { label: 'Dew point', value: `${oneDec(payload.dewPoint)}°C`, iconSrc: '/icons/weather/foggy-pier.png' },
+              { label: 'Pressure', value: `${zeroDec(payload.pressure)} hPa`, iconSrc: '/icons/weather/earth.png' },
+              {
+                label: 'Wind',
+                value: `${oneDec(payload.wind)} km/h${isNum(payload.windDirection) ? ` (${Math.round(payload.windDirection)}°)` : ''}`,
+                iconSrc: '/icons/weather/wind.png',
+              },
+              { label: 'Gusts', value: `${zeroDec(payload.windGusts)} km/h`, iconSrc: '/icons/weather/desert-wind-farm.png' },
+              { label: 'Visibility', value: `${oneDec(payload.visibility)} km`, iconSrc: '/icons/weather/cloudless-sulphur.png' },
+              { label: 'UV', value: `${oneDec(payload.uv)}`, iconSrc: '/icons/weather/sun.png' },
+              { label: 'Solar', value: `${zeroDec(payload.solarRad)} W/m²`, iconSrc: '/icons/weather/aztec-sun-stone.png' },
+            ]
+
             return (
-              <div className="grid gap-3 md:grid-cols-3 text-sm text-slate-200">
-                <div className="panel-subtle space-y-1">
-                  <p className="text-xs uppercase text-slate-400">Headline</p>
-                  <p className="metric-value text-white">{payload?.temp}°C</p>
-                  <p>{payload?.summary}</p>
-                  <p className="text-[11px] text-slate-400">Feels like {payload?.feelsLike ?? payload?.temp}°C</p>
-                </div>
-                <div className="panel-subtle space-y-2">
-                  <p className="text-xs uppercase text-slate-400">Vitals</p>
-                  <div className="flex flex-wrap gap-3">
-                    <span>AQI {payload?.aqi ?? '—'}</span>
-                    <span>UV {payload?.uv ?? '—'}</span>
-                    <span>Humidity {payload?.humidity ?? '—'}%</span>
-                    <span>Wind {payload?.wind ?? '—'} km/h</span>
-                  </div>
-                </div>
-                <div className="panel-subtle space-y-1">
-                  <p className="text-xs uppercase text-slate-400">Sun</p>
-                  <p>Sunrise {payload?.sunrise ? new Date(payload.sunrise).toLocaleTimeString() : '—'}</p>
-                  <p>Sunset {payload?.sunset ? new Date(payload.sunset).toLocaleTimeString() : '—'}</p>
-                  <p className="text-[11px] text-slate-400">
-                    Updated {payload?.currentTime ? new Date(payload.currentTime).toLocaleTimeString() : '—'}
+              <div className="grid gap-3 text-sm text-slate-200 lg:grid-cols-[240px_1fr]">
+                <div className="panel-subtle card-elevated space-y-2">
+                  <p className="section-kicker">Current</p>
+                  <p className="flex items-center gap-2.5 text-white">
+                    <img src={icon} alt="Current weather icon" className="h-10 w-10 rounded-md object-cover ring-1 ring-white/15" />
+                    <span className="type-display">{payload.temp ?? '—'}°C</span>
                   </p>
-                </div>
-              </div>
-            )
-          })()
-        )}
-      </Card>
-      <Card title="Hour-by-hour hints" description="Snapshot guidance">
-        {weather.isLoading ? (
-          <Skeleton className="h-16" />
-        ) : weather.error ? (
-          <p className="text-sm text-red-300">Unable to load.</p>
-        ) : (
-          <div className="panel-subtle text-sm text-slate-200">
-            {hourlyHint || 'Hourly guidance not available'}
-          </div>
-        )}
-      </Card>
-
-      <Card title="Next 3 days" description="High/Low/Precip + quick signals">
-        {forecast.isLoading ? (
-          <Skeleton className="h-20" />
-        ) : (
-          (() => {
-            const data = forecast.data?.length ? forecast.data : []
-            return (
-              <div className="divide-y divide-white/5 text-sm text-slate-200">
-                {data.map((day, i) => (
-                  <div key={day.day || day.date || i} className="flex items-center justify-between py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white">{day.day}</span>
-                      <span className="text-xs text-slate-400">{Math.round((day.precip || 0) * 100)}% precip</span>
-                    </div>
-                    <span>
-                      {day.high}° / {day.low}°
-                    </span>
-                    <span className="text-[11px] text-amber-200">
-                      {(day.high > 35 && 'Heat risk') || (day.low < 13 && 'Cool breeze') || 'Mild'}
-                    </span>
+                  <p className="text-slate-200">{payload.summary || 'Conditions unavailable'}</p>
+                  <div className="flex flex-wrap gap-1.5 text-[11px]">
+                    <span className="rounded-full bg-white/10 px-2 py-1">AQI {payload.aqi ?? '—'}</span>
+                    <span className="rounded-full bg-white/10 px-2 py-1">UV {oneDec(payload.uv)}</span>
                   </div>
-                ))}
-              </div>
-            )
-          })()
-        )}
-      </Card>
-
-      <Card title="14-day outlook" description="Compact highs/lows + precip">
-        {extended.isLoading ? (
-          <Skeleton className="h-24" />
-        ) : (
-          (() => {
-            const data = extended.data?.length ? extended.data.slice(0, 14) : []
-            const rainDays = data.filter((d) => (d.precip || 0) > 0.3).length
-            const temps = data.map((d) => ({ high: d.high, low: d.low }))
-            const minLow = Math.min(...temps.map((t) => t.low))
-            const maxHigh = Math.max(...temps.map((t) => t.high))
-            const scale = (val) => {
-              if (!Number.isFinite(val)) return 0
-              return 100 - ((val - minLow) / Math.max(1, maxHigh - minLow)) * 100
-            }
-            const highPoints = data
-              .map((d, i) => {
-                const x = (i / Math.max(1, data.length - 1)) * 100
-                return `${x},${scale(d.high)}`
-              })
-              .join(' ')
-            const lowPoints = data
-              .map((d, i) => {
-                const x = (i / Math.max(1, data.length - 1)) * 100
-                return `${x},${scale(d.low)}`
-              })
-              .join(' ')
-            const comfortPoints = data
-              .map((d, i) => {
-                const comfort = Math.max(0, 100 - Math.abs(((d.high + d.low) / 2 - 25) * 1.2) - (d.precip || 0) * 50)
-                const x = (i / Math.max(1, data.length - 1)) * 100
-                const y = 100 - (comfort / 100) * 100
-                return `${x},${y}`
-              })
-              .join(' ')
-
-            return (
-              <div className="mt-2 space-y-2 rounded-xl border border-white/5 bg-slate-900/60 p-2 relative">
-                {hover14 ? (
-                  <div className="absolute right-2 top-2 rounded-full bg-white/10 px-2 py-1 text-[10px] text-slate-100">
-                    {hover14}
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between text-[10px] text-slate-300">
-                  <span>Rainy: {rainDays}/14</span>
-                  <span>Comfort: 20–29°C</span>
                 </div>
-                <svg viewBox="0 0 100 60" style={graphStyle} preserveAspectRatio="none">
-                  <polyline fill="none" stroke="rgb(59,130,246)" strokeWidth="0.9" points={highPoints} />
-                  <polyline fill="none" stroke="rgb(16,185,129)" strokeWidth="0.9" points={lowPoints} />
-                  <polyline fill="none" stroke="rgb(249,115,22)" strokeWidth="0.6" points={comfortPoints} />
-                  {data.map((d, i) => {
-                    const x = (i / Math.max(1, data.length - 1)) * 100
-                    return (
-                      <circle
-                        key={`h-${i}`}
-                        cx={x}
-                        cy={scale(d.high)}
-                        r="1.2"
-                        fill="rgb(59,130,246)"
-                        onMouseEnter={() => setHover14(`${d.day}: ${d.high}° / ${d.low}°`)}
-                        onMouseLeave={() => setHover14('')}
-                      />
-                    )
-                  })}
-                  {data.map((d, i) => {
-                    const x = (i / Math.max(1, data.length - 1)) * 100
-                    return (
-                      <circle
-                        key={`l-${i}`}
-                        cx={x}
-                        cy={scale(d.low)}
-                        r="1.2"
-                        fill="rgb(16,185,129)"
-                        onMouseEnter={() => setHover14(`${d.day}: ${d.high}° / ${d.low}°`)}
-                        onMouseLeave={() => setHover14('')}
-                      />
-                    )
-                  })}
-                </svg>
-                <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                  <span className="inline-block h-2 w-3 bg-blue-500" /> Highs
-                  <span className="inline-block h-2 w-3 bg-emerald-500" /> Lows
-                  <span className="inline-block h-2 w-3 bg-orange-400" /> Comfort
-                </div>
-                <div className="mt-1">
-                  <p className="text-[10px] uppercase text-slate-400">Precip</p>
-                  <div className="flex items-end gap-1">
-                    {data.map((d, i) => (
-                      <div key={`${d.day || d.date || i}-p-${i}`} className="flex flex-col items-center gap-1">
-                        <div
-                          className="w-2.5 rounded-full bg-blue-400"
-                          style={{ height: `${Math.min(50, Math.round((d.precip || 0) * 100)) / 3}px` }}
-                          title={`${d.day || d.date}: ${Math.round((d.precip || 0) * 100)}%`}
-                          onMouseEnter={() => setHover14(`${d.day || d.date}: Precip ${Math.round((d.precip || 0) * 100)}%`)}
-                          onMouseLeave={() => setHover14('')}
-                        />
-                        <span className="text-[8px] text-slate-400">{(d.day || d.date || '').slice(0, 2)}</span>
+
+                <div className="panel-subtle space-y-2">
+                  <p className="section-kicker">Current metrics</p>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {metricItems.map((item) => (
+                      <div key={item.label} className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                          <img src={item.iconSrc} alt="" aria-hidden="true" className="h-6 w-6 rounded object-cover" loading="eager" decoding="async" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-slate-400">{item.label}</p>
+                          <p className="truncate text-[13px] font-semibold text-slate-100">{item.value}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
-            )
-          })()
-        )}
-      </Card>
 
-      <Card title="AQI & comfort trend" description="Next 14 days (compact)">
-        {extended.isLoading ? (
-          <Skeleton className="h-20" />
-        ) : (
-          (() => {
-            const aqiTrend = (extended.data || []).map((d, i) => ({
-              day: d.day || d.date || `Day ${i + 1}`,
-              aqi: d.aqi ?? 60,
-            }))
-            if (!aqiTrend.length) return <p className="text-sm text-slate-400">No AQI trend data available.</p>
-            const minAqi = Math.min(...aqiTrend.map((d) => d.aqi))
-            const maxAqi = Math.max(...aqiTrend.map((d) => d.aqi))
-            const scaleAqi = (val) => 100 - ((val - minAqi) / Math.max(1, maxAqi - minAqi)) * 100
-            const aqiPoints = aqiTrend
-              .map((d, i) => {
-                const x = (i / Math.max(1, aqiTrend.length - 1)) * 100
-                return `${x},${scaleAqi(d.aqi)}`
-              })
-              .join(' ')
-            return (
-              <div className="space-y-1 rounded-xl border border-white/5 bg-slate-900/60 p-2">
-                <svg viewBox="0 0 100 50" style={graphStyle} preserveAspectRatio="none">
-                  <polyline fill="none" stroke="rgb(239,68,68)" strokeWidth="1" points={aqiPoints} />
-                  {aqiTrend.map((d, i) => {
-                    const x = (i / Math.max(1, aqiTrend.length - 1)) * 100
-                    const y = scaleAqi(d.aqi)
-                    return (
-                      <circle key={`aq-${i}`} cx={x} cy={y} r="1.2" fill="rgb(239,68,68)">
-                        <title>{`${d.day}: AQI ${d.aqi}`}</title>
-                      </circle>
-                    )
-                  })}
-                </svg>
-                <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                  <span className="inline-block h-2 w-3 bg-red-500" /> AQI
+                <div className="panel-subtle space-y-1 lg:col-span-2">
+                  <p className="section-kicker">Language</p>
+                  <p className="type-body text-slate-200">{shortLanguage}</p>
                 </div>
               </div>
             )
@@ -271,46 +117,158 @@ const ForecastPage = () => {
         )}
       </Card>
 
-      <Card title="Next 24 hours" description="Temperature & precip trend (compact)">
-        {hourly.isLoading ? (
+      <Card title="Next 3 days" description="High/low and outdoor-readiness">
+        {forecast.isLoading ? (
           <Skeleton className="h-20" />
         ) : (
+            <div className="divide-y divide-white/5 text-sm text-slate-200">
+             {(forecast.data || []).map((day, index) => {
+               const note =
+                 (day.precip || 0) > 0.35
+                   ? 'Rain windows likely'
+                   : day.high > 34
+                   ? 'Warm peak by afternoon'
+                   : 'Comfortable day profile'
+               return (
+                 <div key={day.day || index} className="grid gap-1 py-2 md:grid-cols-[1fr_auto_auto_auto] md:items-center md:gap-3">
+                   <span className="font-semibold text-white">{day.day}</span>
+                   <span className="text-slate-200">{day.high}° / {day.low}°</span>
+                   {day.windMax != null && <span className="text-[11px] text-sky-300">💨 {day.windMax} km/h</span>}
+                   <span className="text-[11px] text-amber-200">{note}</span>
+                 </div>
+               )
+             })}
+          </div>
+        )}
+      </Card>
+
+      <Card title="14-day forecast" description="Breathable trend chart with hover details on all 14 days">
+        {extended.isLoading ? (
+          <Skeleton className="h-24" />
+        ) : (
           (() => {
-            const hrs = hourly.data?.length ? hourly.data.slice(0, 24) : []
-            const minT = Math.min(...hrs.map((h) => h.temp))
-            const maxT = Math.max(...hrs.map((h) => h.temp))
-            const scaleT = (t) => 100 - ((t - minT) / Math.max(1, maxT - minT)) * 100
-            const tempPoints = hrs
-              .map((h, i) => {
-                const x = (i / Math.max(1, hrs.length - 1)) * 100
-                return `${x},${scaleT(h.temp)}`
+            const data = (extended.data || []).slice(0, 14)
+            if (!data.length) return <p className="text-sm text-slate-400">No extended data available.</p>
+
+            const chartW = 760
+            const chartH = 320
+            const margin = { top: 26, right: 22, bottom: 52, left: 54 }
+            const plotW = chartW - margin.left - margin.right
+            const plotH = chartH - margin.top - margin.bottom
+
+            const minLow = Math.min(...data.map((d) => d.low))
+            const maxHigh = Math.max(...data.map((d) => d.high))
+            const yMin = Math.floor((minLow - 2) / 2) * 2
+            const yMax = Math.ceil((maxHigh + 2) / 2) * 2
+            const yRange = Math.max(1, yMax - yMin)
+
+            const xAt = (index) => margin.left + (index / Math.max(1, data.length - 1)) * plotW
+            const yAt = (temp) => margin.top + ((yMax - temp) / yRange) * plotH
+
+            const highPath = data.map((d, i) => `${xAt(i)},${yAt(d.high)}`).join(' ')
+            const lowPath = data.map((d, i) => `${xAt(i)},${yAt(d.low)}`).join(' ')
+            const yTicks = Array.from({ length: 5 }, (_, i) => yMin + (yRange / 4) * i)
+
+            const showDayInfo = (day, pointIndex) => {
+              setHover14({
+                day: day.day,
+                pointIndex,
+                high: day.high,
+                low: day.low,
+                precip: day.precipSum,
+                wind: day.windMax,
               })
-              .join(' ')
+            }
+
+            const clearDayInfo = () => setHover14(null)
+            const hoverLeft = hover14 ? Math.min(92, Math.max(8, (hover14.pointIndex / Math.max(1, data.length - 1)) * 100)) : 50
+
             return (
-              <div className="space-y-1 rounded-xl border border-white/5 bg-slate-900/60 p-2">
-                <svg viewBox="0 0 100 50" style={graphStyle} preserveAspectRatio="none">
-                  <polyline fill="none" stroke="rgb(251,191,36)" strokeWidth="1" points={tempPoints} />
-                  {hrs.slice(0, 12).map((h, i) => {
-                    const x = (i / Math.max(1, hrs.length - 1)) * 100
-                    const y = scaleT(h.temp)
-                    return (
-                      <circle key={`t-${i}`} cx={x} cy={y} r="1" fill="rgb(251,191,36)">
-                        <title>{`+${h.hour}h: ${h.temp}°`}</title>
-                      </circle>
-                    )
-                  })}
-                </svg>
-                <div className="flex items-end gap-1">
-                  {hrs.slice(0, 12).map((h, i) => (
-                    <div key={`p-${i}`} className="flex flex-col items-center gap-0.5 text-[9px] text-slate-300">
-                      <div
-                        className="w-2.5 rounded-full bg-blue-400"
-                        style={{ height: `${Math.min(40, Math.round((h.precip || 0) * 100)) / 3}px` }}
-                        title={`+${h.hour}h: ${Math.round((h.precip || 0) * 100)}%`}
-                      />
-                      <span>+{h.hour}h</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="section-kicker">14-day trend</span>
+                  <span>Hover any day point for details</span>
+                </div>
+
+                <div className="relative rounded-2xl border border-white/10 bg-slate-900/55 p-3">
+                  {hover14 ? (
+                    <div
+                      className="pointer-events-none absolute top-2 z-20 w-max -translate-x-1/2 rounded-lg border border-white/15 bg-slate-950/90 px-2.5 py-1.5 text-[11px] text-slate-100 shadow-lg"
+                      style={{ left: `${hoverLeft}%` }}
+                    >
+                      <p className="font-semibold text-white">{hover14.day}</p>
+                      <p className="text-slate-300">H {hover14.high}° · L {hover14.low}°</p>
+                      <p className="text-slate-400">Rain {hover14.precip > 0 ? `${hover14.precip.toFixed(1)} mm` : 'Dry'} · Wind {hover14.wind != null ? `${hover14.wind} km/h` : '—'}</p>
                     </div>
-                  ))}
+                  ) : null}
+
+                  <div className="rounded-xl border border-white/10 bg-slate-950/65 p-2" onMouseLeave={clearDayInfo}>
+                    <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full aspect-[760/320]" preserveAspectRatio="xMidYMid meet" role="img" aria-label="14-day high and low trend with axes">
+                      <defs>
+                        <linearGradient id="forecastHigh" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="rgba(56,189,248,0.95)" />
+                          <stop offset="100%" stopColor="rgba(59,130,246,0.95)" />
+                        </linearGradient>
+                        <linearGradient id="forecastLow" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="rgba(52,211,153,0.95)" />
+                          <stop offset="100%" stopColor="rgba(16,185,129,0.95)" />
+                        </linearGradient>
+                      </defs>
+
+                      {yTicks.map((tick, idx) => {
+                        const y = yAt(tick)
+                        return (
+                          <g key={`y-${idx}`}>
+                            <line x1={margin.left} y1={y} x2={chartW - margin.right} y2={y} stroke="rgba(148,163,184,0.14)" strokeDasharray="2 4" />
+                            <text x={margin.left - 8} y={y + 3} textAnchor="end" fontSize="10" fill="rgba(148,163,184,0.9)">{Math.round(tick)}°</text>
+                          </g>
+                        )
+                      })}
+
+                      <line x1={margin.left} y1={margin.top} x2={margin.left} y2={chartH - margin.bottom} stroke="rgba(226,232,240,0.45)" />
+                      <line x1={margin.left} y1={chartH - margin.bottom} x2={chartW - margin.right} y2={chartH - margin.bottom} stroke="rgba(226,232,240,0.45)" />
+
+                      {data.map((day, i) => {
+                        const x = xAt(i)
+                        return (
+                          <g key={`hover-band-${day.day}-${i}`}>
+                            <rect
+                              x={x - plotW / Math.max(1, data.length - 1) / 2}
+                              y={margin.top}
+                              width={plotW / Math.max(1, data.length - 1)}
+                              height={plotH}
+                              fill="transparent"
+                              onMouseEnter={() => showDayInfo(day, i)}
+                              onFocus={() => showDayInfo(day, i)}
+                            />
+                          </g>
+                        )
+                      })}
+
+                      <polyline fill="none" stroke="url(#forecastHigh)" strokeWidth="2" points={highPath} />
+                      <polyline fill="none" stroke="url(#forecastLow)" strokeWidth="2" points={lowPath} />
+
+                      {data.map((d, i) => {
+                        const x = xAt(i)
+                        const active = hover14?.pointIndex === i
+                        return (
+                          <g key={`${d.day}-${i}`}>
+                            <circle cx={x} cy={yAt(d.high)} r={active ? '4' : '3'} fill="rgba(56,189,248,1)" onMouseEnter={() => showDayInfo(d, i)} onTouchStart={() => showDayInfo(d, i)} />
+                            <circle cx={x} cy={yAt(d.low)} r={active ? '4' : '3'} fill="rgba(52,211,153,1)" onMouseEnter={() => showDayInfo(d, i)} onTouchStart={() => showDayInfo(d, i)} />
+                            <text x={x} y={chartH - margin.bottom + 14} textAnchor="middle" fontSize="10" fill="rgba(148,163,184,0.9)">{String(d.day || '').slice(0, 3)}</text>
+                          </g>
+                        )
+                      })}
+
+                      <text x={margin.left + plotW / 2} y={chartH - 6} textAnchor="middle" fontSize="10" fill="rgba(148,163,184,0.9)">Day</text>
+                      <text x={12} y={margin.top + plotH / 2} textAnchor="middle" fontSize="10" fill="rgba(148,163,184,0.9)" transform={`rotate(-90 12 ${margin.top + plotH / 2})`}>Temperature °C</text>
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/15 px-2 py-0.5 text-cyan-100"><span className="inline-block h-2 w-3 rounded bg-cyan-400" /> Daily high</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-100"><span className="inline-block h-2 w-3 rounded bg-emerald-400" /> Daily low</span>
                 </div>
               </div>
             )

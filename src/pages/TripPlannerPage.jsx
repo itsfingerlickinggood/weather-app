@@ -3,6 +3,7 @@ import Card from '../components/Card'
 import Skeleton from '../components/Skeleton'
 import { useExtendedForecast, useLocations } from '../hooks/queries'
 import LocationSearch from '../components/LocationSearch'
+import AppIcon from '../components/AppIcon'
 
 const defaultTrips = [{ id: 'trip-1', locationId: 'tvm', label: 'Thiruvananthapuram coast weekend', days: 3 }]
 
@@ -44,6 +45,10 @@ const TripCard = ({ trip, location, onUpdate }) => {
   const pack = packList(daysData)
   const rainyDays = daysData.filter((d) => (d.precip || 0) > 0.3).length
   const hotDays = daysData.filter((d) => (d.high || 0) > 34).length
+  const riskWindow = daysData
+    .filter((d) => (d.precip || 0) > 0.35 || (d.high || 0) > 35)
+    .map((d) => d.day)
+    .slice(0, 3)
 
   return (
     <Card title={location?.name || trip.label} description={`${trip.days} days`}>
@@ -51,6 +56,17 @@ const TripCard = ({ trip, location, onUpdate }) => {
         <Skeleton className="h-24" />
       ) : (
         <div className="space-y-3 text-sm text-slate-200">
+          <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+            <p className="section-kicker flex items-center gap-1"><AppIcon name="calendar" className="h-3.5 w-3.5" />Narrative summary</p>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-white/10 px-3 py-1 inline-flex items-center gap-1"><AppIcon name="sun" className="h-3 w-3" />Best day {best?.day || '—'}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 inline-flex items-center gap-1"><AppIcon name="droplet" className="h-3 w-3" />Rainy windows {rainyDays}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 inline-flex items-center gap-1"><AppIcon name="checklist" className="h-3 w-3" />Packing {pack.length} items</span>
+            </div>
+            <p className="mt-2 text-xs text-slate-300">
+              {riskWindow.length ? `Risk windows: ${riskWindow.join(', ')}` : 'No strong risk windows in the selected period.'}
+            </p>
+          </div>
           <div className="flex items-center justify-between rounded-xl border border-white/5 bg-slate-900/60 p-3">
             <span>Best day</span>
             <span className="font-semibold text-white">{best?.day}</span>
@@ -73,7 +89,7 @@ const TripCard = ({ trip, location, onUpdate }) => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-xs uppercase text-slate-400">Packing list</p>
+            <p className="text-xs uppercase text-slate-400 flex items-center gap-1"><AppIcon name="checklist" className="h-3.5 w-3.5" />Packing list</p>
             <ul className="list-disc space-y-1 pl-5 text-slate-200">
               {pack.map((item) => (
                 <li key={item}>{item}</li>
@@ -178,7 +194,7 @@ const TripPlannerPage = () => {
             />
           </div>
           <label className="text-sm text-slate-300">
-            <span className="mb-1 block text-xs uppercase text-slate-400">Days</span>
+            <span className="mb-1 flex items-center gap-1 text-xs uppercase text-slate-400"><AppIcon name="calendar" className="h-3.5 w-3.5" />Days</span>
             <input
               className="focus-ring w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
               type="number"
@@ -189,12 +205,13 @@ const TripPlannerPage = () => {
             />
           </label>
           <div className="flex items-end">
-            <button className="focus-ring w-full rounded-xl bg-blue-500 px-3 py-2 text-white" onClick={addTrip}>
+            <button className="focus-ring inline-flex w-full items-center justify-center gap-1 rounded-xl bg-blue-500 px-3 py-2 text-white" onClick={addTrip}>
+              <AppIcon name="calendar" className="h-4 w-4" />
               Add to itinerary
             </button>
           </div>
           <label className="text-sm text-slate-300">
-            <span className="mb-1 block text-xs uppercase text-slate-400">Start date</span>
+            <span className="mb-1 flex items-center gap-1 text-xs uppercase text-slate-400"><AppIcon name="calendar" className="h-3.5 w-3.5" />Start date</span>
             <input
               type="date"
               className="focus-ring w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
@@ -203,7 +220,7 @@ const TripPlannerPage = () => {
             />
           </label>
           <label className="text-sm text-slate-300">
-            <span className="mb-1 block text-xs uppercase text-slate-400">Travelers</span>
+            <span className="mb-1 flex items-center gap-1 text-xs uppercase text-slate-400"><AppIcon name="users" className="h-3.5 w-3.5" />Travelers</span>
             <input
               className="focus-ring w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
               type="number"
@@ -213,7 +230,7 @@ const TripPlannerPage = () => {
             />
           </label>
           <label className="text-sm text-slate-300">
-            <span className="mb-1 block text-xs uppercase text-slate-400">Style</span>
+            <span className="mb-1 flex items-center gap-1 text-xs uppercase text-slate-400"><AppIcon name="checklist" className="h-3.5 w-3.5" />Style</span>
             <select
               className="focus-ring w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
               value={style}
@@ -226,7 +243,7 @@ const TripPlannerPage = () => {
             </select>
           </label>
           <label className="text-sm text-slate-300">
-            <span className="mb-1 block text-xs uppercase text-slate-400">Budget (est.)</span>
+            <span className="mb-1 flex items-center gap-1 text-xs uppercase text-slate-400"><AppIcon name="adminUsage" className="h-3.5 w-3.5" />Budget (est.)</span>
             <input
               className="focus-ring w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
               type="number"
@@ -248,7 +265,7 @@ const TripPlannerPage = () => {
               <TripCard trip={trip} location={loc} onUpdate={updateTrip} />
               <textarea
                 className="focus-ring w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-white"
-                placeholder="Add personal notes, bookings, contacts"
+                placeholder="📝 Add personal notes, bookings, contacts"
                 value={notes[trip.id] || ''}
                 onChange={(e) => setNotes((prev) => ({ ...prev, [trip.id]: e.target.value }))}
               />

@@ -145,9 +145,9 @@ const CitySearch = ({ compact = false, onSelect }) => {
   const popular = locations.slice(0, 6)
 
   return (
-    <form className={`flex flex-1 flex-col gap-1 ${compact ? '' : 'max-w-xl'}`} onSubmit={handleSubmit}>
+    <form className={`relative flex flex-1 flex-col gap-1 ${compact ? '' : 'max-w-xl'}`} onSubmit={handleSubmit}>
       <div
-        className="flex flex-col gap-1"
+        className={`flex flex-col gap-1 ${compact ? 'relative' : ''}`}
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -160,7 +160,7 @@ const CitySearch = ({ compact = false, onSelect }) => {
           <input
             ref={inputRef}
             id="city-search"
-            className="focus-ring w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            className={`focus-ring w-full rounded-xl border border-white/10 bg-slate-950/60 text-white ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
             placeholder={isLoading ? 'Loading cities…' : 'Search city or region'}
             value={query}
             onChange={(e) => {
@@ -180,21 +180,23 @@ const CitySearch = ({ compact = false, onSelect }) => {
           />
           <button
             type="submit"
-            className="focus-ring rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className={`focus-ring rounded-xl bg-blue-500 font-semibold text-white disabled:opacity-60 ${compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'}`}
             disabled={isLoading}
           >
             Find
           </button>
         </div>
-        <p id={assistiveId} className="text-[11px] text-slate-400">
-          Kerala-first ranking • type then use ↑/↓ and Enter to select. Esc closes suggestions.
-        </p>
+        {!compact ? (
+          <p id={assistiveId} className="text-[11px] text-slate-400">
+            Kerala-first ranking • type then use ↑/↓ and Enter to select. Esc closes suggestions.
+          </p>
+        ) : null}
         {open ? (
           <div
             ref={listRef}
             id={listboxId}
             role="listbox"
-            className="relative z-10 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-slate-900/90 shadow-xl shadow-black/40"
+            className={`${compact ? 'absolute left-0 right-0 top-full mt-1 z-40' : 'relative z-10'} max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-slate-900/90 shadow-xl shadow-black/40`}
           >
             {ranked.length ? (
               ranked.map((loc, idx) => {
@@ -227,19 +229,21 @@ const CitySearch = ({ compact = false, onSelect }) => {
           </div>
         ) : null}
       </div>
-      <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-        {popular.map((loc) => (
-          <button
-            key={loc.id}
-            type="button"
-            className="focus-ring rounded-full bg-white/5 px-3 py-1"
-            onClick={() => selectLocation(loc)}
-          >
-            {loc.name}
-          </button>
-        ))}
-      </div>
-      {error ? <p className="text-xs text-amber-200">{error}</p> : null}
+      {!compact ? (
+        <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+          {popular.map((loc) => (
+            <button
+              key={loc.id}
+              type="button"
+              className="focus-ring rounded-full bg-white/5 px-3 py-1"
+              onClick={() => selectLocation(loc)}
+            >
+              {loc.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {error && !compact ? <p className="text-xs text-amber-200">{error}</p> : null}
     </form>
   )
 }

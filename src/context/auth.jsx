@@ -5,6 +5,17 @@ import { getRemoteSession, loginRemote, logoutRemote, signupRemote } from '../li
 
 const AuthContext = createContext(null)
 
+const isBackendUnavailable = (err) => {
+  const code = err?.code || err?.response?.code
+  const message = (err?.message || '').toLowerCase()
+  return (
+    code === 'ERR_NETWORK' ||
+    message.includes('network error') ||
+    message.includes('failed to fetch') ||
+    message.includes('connection refused')
+  )
+}
+
 export const AuthProvider = ({ children }) => {
   const useRemoteAuth = import.meta.env.VITE_USE_REMOTE_AUTH === 'true' && !!import.meta.env.VITE_API_URL
   const autoLoginDemo = !useRemoteAuth && import.meta.env.VITE_AUTO_LOGIN_DEMO === 'true'
@@ -53,6 +64,25 @@ export const AuthProvider = ({ children }) => {
         setStatus('ready')
         return found
       } catch (err) {
+        if (useRemoteAuth && isBackendUnavailable(err)) {
+          try {
+            const fallbackUser = loginLocal(email, password)
+            if (!fallbackUser) {
+              setError('Backend unavailable. Account not found locally. Please sign up to continue.')
+              setStatus('ready')
+              return null
+            }
+            setError('Backend unavailable. Signed in using local mode.')
+            setUser(fallbackUser)
+            setStatus('ready')
+            return fallbackUser
+          } catch (fallbackErr) {
+            const fallbackMessage = fallbackErr?.message || 'Login failed'
+            setError(fallbackMessage)
+            setStatus('ready')
+            return null
+          }
+        }
         const message = err?.response?.data?.error || err?.message || 'Login failed'
         setError(message)
         setStatus('ready')
@@ -77,6 +107,25 @@ export const AuthProvider = ({ children }) => {
         setStatus('ready')
         return created
       } catch (err) {
+        if (useRemoteAuth && isBackendUnavailable(err)) {
+          try {
+            const fallbackCreated = signupLocal(email, password)
+            if (!fallbackCreated) {
+              setError('Backend unavailable. User already exists locally. Try logging in.')
+              setStatus('ready')
+              return null
+            }
+            setError('Backend unavailable. Signed up using local mode.')
+            setUser(fallbackCreated)
+            setStatus('ready')
+            return fallbackCreated
+          } catch (fallbackErr) {
+            const fallbackMessage = fallbackErr?.message || 'Signup failed'
+            setError(fallbackMessage)
+            setStatus('ready')
+            return null
+          }
+        }
         const message = err?.response?.data?.error || err?.message || 'Signup failed'
         setError(message)
         setStatus('ready')

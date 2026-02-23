@@ -12,10 +12,18 @@ const ComparisonCard = ({ id, label }) => {
     <div className="space-y-2 text-sm text-slate-200">
       <p className="text-lg font-semibold text-white">{label}</p>
       <div className="grid grid-cols-2 gap-2">
-        <span>Temp: {payload?.temp}°C</span>
-        <span>AQI: {payload?.aqi}</span>
-        <span>UV: {payload?.uv}</span>
-        <span>Humidity: {payload?.humidity}%</span>
+        <span>Temp: {payload?.temp ?? '—'}°C</span>
+        <span>Feels: {payload?.feelsLike ?? payload?.temp ?? '—'}°C</span>
+        <span>AQI: {payload?.aqi ?? '—'}</span>
+        <span>UV: {payload?.uv ?? '—'}</span>
+        <span>Humidity: {payload?.humidity ?? '—'}%</span>
+        <span>Dew pt: {payload?.dewPoint != null ? `${payload.dewPoint}°C` : '—'}</span>
+        <span>Wind: {payload?.wind ?? '—'} km/h</span>
+        <span>Gusts: {payload?.windGusts ?? '—'} km/h</span>
+        <span>Pressure: {payload?.pressure != null ? `${Math.round(payload.pressure)} hPa` : '—'}</span>
+        <span>Visibility: {payload?.visibility != null ? `${payload.visibility} km` : '—'}</span>
+        {payload?.pm25 != null && <span>PM2.5: {payload.pm25.toFixed(1)} µg/m³</span>}
+        {payload?.pm10 != null && <span>PM10: {payload.pm10.toFixed(1)} µg/m³</span>}
       </div>
     </div>
   )

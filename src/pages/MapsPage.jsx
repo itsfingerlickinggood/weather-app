@@ -4,11 +4,28 @@ import MapView from '../components/MapView'
 import { useLocations, useAlerts, useRisk, useHourly } from '../hooks/queries'
 import LocationSearch from '../components/LocationSearch'
 
-const seededRandom = (seed, idx = 0) => {
-  const s = `${seed}-${idx}`
-  let h = 0
-  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 1000000
-  return Math.abs(Math.sin(h)) % 1
+const legendIcons = {
+  precip: '/icons/weather/rain.png',
+  aqi: '/icons/weather/health.png',
+  uv: '/icons/weather/sun.png',
+}
+
+const legendScales = {
+  precip: [
+    { label: 'Low', value: '0–20', tone: 'bg-cyan-400/80' },
+    { label: 'Moderate', value: '21–50', tone: 'bg-blue-400/80' },
+    { label: 'High', value: '51+', tone: 'bg-indigo-400/80' },
+  ],
+  aqi: [
+    { label: 'Good', value: '0–50', tone: 'bg-emerald-400/80' },
+    { label: 'Moderate', value: '51–100', tone: 'bg-amber-400/80' },
+    { label: 'Unhealthy', value: '101+', tone: 'bg-red-400/80' },
+  ],
+  uv: [
+    { label: 'Low', value: '0–2', tone: 'bg-cyan-400/80' },
+    { label: 'Moderate', value: '3–5', tone: 'bg-amber-400/80' },
+    { label: 'High', value: '6+', tone: 'bg-orange-400/80' },
+  ],
 }
 
 const MapsPage = () => {
@@ -20,37 +37,37 @@ const MapsPage = () => {
   const risk = useRisk(selected)
   const hourly = useHourly(selected)
 
-  const center = useMemo(() => {
-    const loc = locations.find((l) => l.id === selected)
-    return loc ? [loc.lon, loc.lat] : [77.5, 12.9]
-  }, [locations, selected])
+  const selectedLoc = useMemo(() => locations.find((l) => l.id === selected), [locations, selected])
 
+  const center = useMemo(
+    () => (selectedLoc ? [selectedLoc.lon, selectedLoc.lat] : [76.5, 10.0]),
+    [selectedLoc],
+  )
+
+  const marker = useMemo(
+    () => (selectedLoc ? { lat: selectedLoc.lat, lon: selectedLoc.lon, name: selectedLoc.name } : null),
+    [selectedLoc],
+  )
+
+  // Single intensity point at the city centre — average of the selected hour window
   const points = useMemo(() => {
-    const loc = locations.find((l) => l.id === selected)
-    if (!loc) return []
-    const fromHourly =
-      hourly.data?.length &&
-      hourly.data.slice(0, hours).map((h, idx) => ({
-        lon: loc.lon + Math.cos(idx) * 0.08 * (idx / hours),
-        lat: loc.lat + Math.sin(idx) * 0.08 * (idx / hours),
-        intensity: layer === 'aqi' ? h.aqi || 0 : layer === 'uv' ? (h.uv || 0) * 10 : Math.round((h.precip || 0) * 100),
-      }))
-    if (fromHourly && fromHourly.length) return fromHourly
-
-    // Fallback synthetic points
-    const synthetic = Array.from({ length: 8 }).map((_, idx) => {
-      const r = seededRandom(loc.id, idx)
-      const radius = 0.05 + r * 0.12
-      const angle = (idx / 8) * Math.PI * 2
-      const base = layer === 'aqi' ? 40 + r * 120 : layer === 'uv' ? 2 + r * 10 : r * 100
-      return {
-        lon: loc.lon + Math.cos(angle) * radius,
-        lat: loc.lat + Math.sin(angle) * radius,
-        intensity: Math.round(base),
-      }
-    })
-    return synthetic
-  }, [hourly.data, hours, layer, locations, selected])
+    if (!selectedLoc) return []
+    const slice = hourly.data?.slice(0, hours) || []
+    let intensity = 0
+    if (slice.length) {
+      const sum = slice.reduce((acc, h) => {
+        const val =
+          layer === 'aqi'
+            ? h.aqi || 0
+            : layer === 'uv'
+              ? (h.uv || 0) * 10
+              : Math.round((h.precip || 0) * 100)
+        return acc + val
+      }, 0)
+      intensity = Math.round(sum / slice.length)
+    }
+    return [{ lon: selectedLoc.lon, lat: selectedLoc.lat, intensity }]
+  }, [hourly.data, hours, layer, selectedLoc])
 
   return (
     <div className="space-y-4">
@@ -64,34 +81,32 @@ const MapsPage = () => {
             placeholder="Type to search city"
           />
         </div>
-        <label className="text-sm text-slate-200">
-          <span className="mr-2 text-xs uppercase text-slate-400">Layer</span>
-          <select
-            className="focus-ring rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
-            value={layer}
-            onChange={(e) => setLayer(e.target.value)}
-          >
-            <option value="precip">Precip</option>
-            <option value="aqi">AQI</option>
-            <option value="uv">UV</option>
-          </select>
-        </label>
-        <label className="text-sm text-slate-200">
-          <span className="mr-2 text-xs uppercase text-slate-400">Hours</span>
-          <select
-            className="focus-ring rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
-            value={hours}
-            onChange={(e) => setHours(Number(e.target.value))}
-          >
-            <option value={6}>Next 6h</option>
-            <option value={12}>Next 12h</option>
-            <option value={24}>Next 24h</option>
-          </select>
-        </label>
       </div>
 
-      <Card title="Radar" description="Smooth pan/zoom with alert overlays">
-        <MapView center={center} zoom={8} points={points} layer={layer} />
+      <Card title="Radar" description="Map-first view with quick controls">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-slate-400">Layer</span>
+          {['precip', 'aqi', 'uv'].map((option) => (
+            <button
+              key={option}
+              className={`chip-control ${layer === option ? 'chip-control-active' : ''}`}
+              onClick={() => setLayer(option)}
+            >
+              {option.toUpperCase()}
+            </button>
+          ))}
+          <span className="ml-1 text-[11px] uppercase tracking-wide text-slate-400">Window</span>
+          {[6, 12, 24].map((window) => (
+            <button
+              key={window}
+              className={`chip-control ${hours === window ? 'chip-control-active' : ''}`}
+              onClick={() => setHours(window)}
+            >
+              {window}h
+            </button>
+          ))}
+        </div>
+        <MapView center={center} zoom={9} points={points} layer={layer} marker={marker} />
         <div className="mt-3 grid gap-3 md:grid-cols-3 text-sm text-slate-200">
           <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
             <p className="text-xs uppercase text-slate-400">Alerts</p>
@@ -106,38 +121,59 @@ const MapsPage = () => {
           <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
             <p className="text-xs uppercase text-slate-400">Layer intensity</p>
             <p className="text-lg font-semibold text-white">
-              {points.length ? Math.max(...points.map((p) => p.intensity)).toFixed(0) : '—'}
+              {points.length ? points[0].intensity.toFixed(0) : '—'}
             </p>
-            <p className="text-[11px] text-slate-400">Based on next {hours}h {layer.toUpperCase()} samples</p>
+            <p className="text-[11px] text-slate-400">Average for next {hours}h ({layer.toUpperCase()})</p>
           </div>
         </div>
       </Card>
 
       <Card title="Legend & context" description="Understand what you see">
-        <div className="grid gap-3 md:grid-cols-4 text-xs text-slate-200">
+        <details className="rounded-2xl border border-white/5 bg-slate-900/55 p-3 text-xs text-slate-200" open>
+          <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Show map interpretation notes
+          </summary>
+          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/65 p-3">
+            <div className="flex items-center gap-2">
+              <img src={legendIcons[layer]} alt="Active layer icon" className="h-6 w-6 rounded object-cover" />
+              <p className="text-sm font-semibold text-white">{layer.toUpperCase()} layer scale</p>
+              <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-200">{hours}h avg</span>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              {(legendScales[layer] || []).map((step) => (
+                <div key={step.label} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-block h-2.5 w-6 rounded ${step.tone}`} />
+                    <span className="text-xs font-semibold text-slate-100">{step.label}</span>
+                    <span className="ml-auto text-[11px] text-slate-400">{step.value}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-4 text-xs text-slate-200">
           <div className="space-y-1">
             <p className="text-[11px] uppercase text-slate-400">Layers</p>
-            <p>Precip: blue/teal bubbles (mm/hr)</p>
-            <p>AQI: green→amber→red bubbles</p>
-            <p>UV: cyan→amber→orange bubbles</p>
+            <p>Precip: blue/teal bubble (mm/hr)</p>
+            <p>AQI: green→amber→red bubble</p>
+            <p>UV: cyan→amber→orange bubble</p>
           </div>
           <div className="space-y-1">
             <p className="text-[11px] uppercase text-slate-400">Time window</p>
-            <p>Uses next {hours} hours of hourly data for intensity spread.</p>
-            <p>Switch hours to widen/narrow the sweep.</p>
+            <p>Uses next {hours} hours of hourly data averaged to one intensity point.</p>
           </div>
           <div className="space-y-1">
             <p className="text-[11px] uppercase text-slate-400">Tips</p>
-            <p>Zoom/pan to inspect local gradients.</p>
-            <p>Change layer to compare AQI vs UV hotspots.</p>
+            <p>Zoom/pan to inspect your city and surroundings.</p>
+            <p>Switch layers to compare AQI vs UV hotspots.</p>
           </div>
           <div className="space-y-1">
             <p className="text-[11px] uppercase text-slate-400">Quick read</p>
             <p>Alerts &gt;0: watch advisory zones.</p>
             <p>Risk ≥50: prepare a backup plan.</p>
-            <p>Layer max → strongest hotspot on map.</p>
           </div>
-        </div>
+          </div>
+        </details>
       </Card>
     </div>
   )

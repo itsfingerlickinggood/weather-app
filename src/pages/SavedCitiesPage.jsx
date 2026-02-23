@@ -77,11 +77,15 @@ const SavedTile = ({ id, name, onRemove }) => {
             <span className="text-xs text-slate-400">Feels {current?.feelsLike ?? current?.temp}°C</span>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            <span>AQI {current?.aqi}</span>
-            <span>UV {current?.uv}</span>
-            <span>Humidity {current?.humidity}%</span>
-            <span>Wind {current?.wind} km/h</span>
-            <span>Precip {current?.precip}%</span>
+            <span>AQI {current?.aqi ?? '—'}</span>
+            <span>UV {current?.uv ?? '—'}</span>
+            <span>Humidity {current?.humidity ?? '—'}%</span>
+            <span>Wind {current?.wind ?? '—'} km/h</span>
+            {current?.windGusts != null && <span>Gusts {current.windGusts} km/h</span>}
+            {current?.dewPoint != null && <span>Dew {current.dewPoint}°C</span>}
+            {current?.pressure != null && <span>{Math.round(current.pressure)} hPa</span>}
+            {current?.visibility != null && <span>Vis {current.visibility} km</span>}
+            {current?.pm25 != null && <span>PM2.5 {current.pm25.toFixed(1)}</span>}
           </div>
           <p className="text-[11px] text-slate-400">
             Updated {current?.currentTime ? new Date(current.currentTime).toLocaleTimeString() : '—'}

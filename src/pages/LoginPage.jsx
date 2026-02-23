@@ -1,26 +1,27 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth'
-import Card from '../components/Card'
+import AppIcon from '../components/AppIcon'
 
 const DEMO_USERS = [
-  { label: 'Login as User', email: 'user@example.com', password: import.meta.env.VITE_DEMO_USER_PASSWORD || 'changeme' },
-  { label: 'Login as Admin', email: 'admin@example.com', password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'changeme' },
+  { label: 'Demo user', email: 'user@example.com', password: import.meta.env.VITE_DEMO_USER_PASSWORD || 'changeme' },
+  { label: 'Demo admin', email: 'admin@example.com', password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'changeme' },
 ]
 
 const LoginPage = () => {
   const { login, signup, loading, error } = useAuth()
-  const isRemoteAuth = import.meta.env.VITE_USE_REMOTE_AUTH === 'true'
   const navigate = useNavigate()
   const location = useLocation()
+
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('user@example.com')
   const [password, setPassword] = useState('')
   const [localError, setLocalError] = useState('')
+  const [errorKey, setErrorKey] = useState(0)
 
   const redirect = () => {
-    const redirectTo = location.state?.from?.pathname || '/'
-    navigate(redirectTo, { replace: true })
+    const to = location.state?.from?.pathname || '/'
+    navigate(to, { replace: true })
   }
 
   const handleAuth = async (e) => {
@@ -28,102 +29,145 @@ const LoginPage = () => {
     setLocalError('')
     if (!email || !password) {
       setLocalError('Enter email and password')
+      setErrorKey((k) => k + 1)
       return
     }
-    const run = mode === 'login' ? login : signup
-    const result = await run(email, password)
+    const result = await (mode === 'login' ? login : signup)(email, password)
     if (result) redirect()
+    else setErrorKey((k) => k + 1)
   }
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-6">
-      <Card
-        title="Sign in to your weather"
-        description={isRemoteAuth ? 'Secure server-backed auth via MongoDB.' : 'Local-only auth. No external services.'}
-      >
-        <div className="flex gap-2 text-sm">
-          <button
-            type="button"
-            className={`focus-ring rounded-full px-4 py-2 ${mode === 'login' ? 'bg-blue-500 text-white' : 'bg-white/5 text-slate-200'}`}
-            onClick={() => setMode('login')}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={`focus-ring rounded-full px-4 py-2 ${mode === 'signup' ? 'bg-blue-500 text-white' : 'bg-white/5 text-slate-200'}`}
-            onClick={() => setMode('signup')}
-          >
-            Sign up
-          </button>
+    <div className="login-page">
+      {/* Ambient orbs */}
+      <div className="login-orbs" aria-hidden="true">
+        <div className="login-orb login-orb-1" />
+        <div className="login-orb login-orb-2" />
+        <div className="login-orb login-orb-3" />
+      </div>
+
+      {/* Centred column */}
+      <div className="login-center">
+
+        {/* Brand mark */}
+        <div className="login-brand">
+          <div className="login-logo-ring">
+            <AppIcon name="brand" className="h-6 w-6 text-blue-300" />
+          </div>
+          <h1 className="login-title">Kerala Climate Studio</h1>
+          <p className="login-subtitle">Real-time weather for Kerala</p>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          {DEMO_USERS.map((demo) => (
+        {/* Card */}
+        <div className="login-card">
+
+          {/* Mode toggle */}
+          <div className="login-toggle-wrap">
+            <div className="login-toggle-inner">
+              <div
+                className="login-tab-pill"
+                style={{ transform: mode === 'signup' ? 'translateX(100%)' : 'translateX(0)' }}
+                aria-hidden="true"
+              />
+              {[
+                { id: 'login', label: 'Sign in' },
+                { id: 'signup', label: 'Sign up' },
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`focus-ring login-tab-btn ${mode === id ? 'login-tab-active' : 'login-tab-idle'}`}
+                  onClick={() => setMode(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Demo quick-fill */}
+          <div className="login-demo-row">
+            {DEMO_USERS.map((d) => (
+              <button
+                key={d.label}
+                type="button"
+                className="focus-ring login-demo-btn"
+                onClick={() => { setEmail(d.email); setPassword(d.password); setMode('login') }}
+                disabled={loading}
+              >
+                <span className="login-demo-icon">
+                  <AppIcon name="users" className="h-2.5 w-2.5 text-blue-300" />
+                </span>
+                <span>{d.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleAuth} className="login-form" noValidate>
+            <div className="login-field">
+              <label className="login-label" htmlFor="lp-email">Email</label>
+              <input
+                id="lp-email"
+                className="focus-ring login-input"
+                type="email"
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="login-field">
+              <label className="login-label" htmlFor="lp-password">Password</label>
+              <input
+                id="lp-password"
+                className="focus-ring login-input"
+                type="password"
+                name="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+            </div>
+
+            {(localError || error) ? (
+              <p key={errorKey} className="login-error">
+                <AppIcon name="alert" className="h-3.5 w-3.5 flex-shrink-0" />
+                {localError || error}
+              </p>
+            ) : null}
+
             <button
-              key={demo.label}
-              type="button"
-              className="focus-ring rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              onClick={() => {
-                setEmail(demo.email)
-                setPassword(demo.password)
-                setMode('login')
-              }}
+              type="submit"
+              className="focus-ring login-submit"
               disabled={loading}
             >
-              {demo.label}
+              {loading ? (
+                <span className="login-loading">
+                  <span className="login-spinner" />
+                  Working…
+                </span>
+              ) : (
+                mode === 'login' ? 'Sign in' : 'Create account'
+              )}
             </button>
-          ))}
+          </form>
         </div>
-        <p className="text-xs text-slate-400">
-          {isRemoteAuth ? 'Accounts stored in MongoDB.' : 'All stored locally; no network calls.'}
+
+        {/* Footer */}
+        <p className="login-footer">
+          <Link className="login-back-link" to="/">← Back to app</Link>
         </p>
 
-        <form className="space-y-4" onSubmit={handleAuth}>
-          <label className="block text-sm">
-            <span className="text-slate-300">Email</span>
-            <input
-              className="focus-ring mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-slate-100"
-              name="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="text-slate-300">Password</span>
-            <input
-              className="focus-ring mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-slate-100"
-              name="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
-          {localError ? <p className="text-sm text-red-300">{localError}</p> : null}
-          {error ? <p className="text-sm text-red-300">{error}</p> : null}
-          <button
-            type="submit"
-            className="focus-ring w-full rounded-xl bg-blue-500 px-4 py-2 font-semibold text-white disabled:opacity-60"
-            disabled={loading}
-          >
-            {loading ? 'Working…' : mode === 'login' ? 'Login' : 'Create account'}
-          </button>
-          <p className="text-xs text-slate-400">Demo: user@example.com / changeme</p>
-        </form>
-      </Card>
-      <div className="text-center text-xs text-slate-500">
-        {isRemoteAuth ? 'Server-backed auth is enabled.' : 'Local-only auth for demo; delete data in Settings to reset.'}
-      </div>
-      <div className="text-center text-xs text-slate-500">
-        <Link className="text-blue-200 underline" to="/">
-          Return to app
-        </Link>
       </div>
     </div>
   )
 }
 
 export default LoginPage
+

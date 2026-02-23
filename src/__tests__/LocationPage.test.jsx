@@ -9,7 +9,7 @@ import api from '../lib/api'
 import { SESSION_KEY } from '../localUsers'
 
 const renderPage = () => {
-  const client = new QueryClient()
+  const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } })
   return render(
     <QueryClientProvider client={client}>
       <UIProvider>
@@ -71,8 +71,8 @@ describe('LocationPage', () => {
     renderPage()
 
     await waitFor(() => {
-      expect(screen.getByText(/Current conditions/i)).toBeInTheDocument()
-      expect(screen.getByText(/Outdoor safety status/i)).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /^Current$/i })).toBeInTheDocument()
+      expect(screen.getByText(/Alert status/i)).toBeInTheDocument()
     })
   })
 })

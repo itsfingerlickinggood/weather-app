@@ -44,28 +44,27 @@ const RadarPage = () => {
           </select>
         </label>
       </div>
-      <Card title="Radar snapshot" description="Animated sweep driven by hourly precipitation">
+      <Card title="Radar snapshot" description="Animated sweep from hourly precipitation">
         {isLoading ? (
           <Skeleton className="h-24" />
         ) : (
           <div className="radar-shell" role="presentation">
             <div className="radar-sweep" aria-hidden="true" />
             <div className="radar-overlay" aria-hidden="true" />
-            <div className="grid grid-cols-6 gap-2" role="tablist" aria-label="Radar hourly bins">
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-6" role="list" aria-label="Radar hourly data">
               {data?.map((hour) => {
                 const intensity = Math.max(8, ((hour.precip || 0) / maxPrecip) * 38)
                 return (
-                  <div
-                    role="tab"
-                    key={hour.hour}
-                    className="flex flex-col items-center gap-1 rounded-xl border border-white/5 bg-slate-900/60 p-2"
-                  >
+                  <div key={hour.hour} role="listitem" className="flex flex-col items-center gap-1 rounded-xl border border-white/5 bg-slate-900/60 p-2">
                     <span className="text-xs text-slate-400">+{hour.hour}h</span>
                     <span
                       className="w-full rounded bg-gradient-to-b from-blue-400/70 to-emerald-400/30"
                       style={{ height: `${intensity}px` }}
                     />
                     <span className="text-[11px] text-slate-300">Precip {Math.round((hour.precip || 0) * 100)}%</span>
+                    {hour.wind != null && <span className="text-[11px] text-sky-300">💨{hour.wind}km/h</span>}
+                    {hour.uv != null && hour.uv > 0 && <span className="text-[11px] text-amber-300">UV{hour.uv}</span>}
+                    {hour.aqi != null && <span className="text-[11px] text-emerald-300">AQI{hour.aqi}</span>}
                   </div>
                 )
               })}
@@ -75,21 +74,21 @@ const RadarPage = () => {
       </Card>
 
       <Card title="Live map" description="OpenMap tiles with AQI/UV/precip layers">
-        <div className="flex flex-wrap items-center gap-3 pb-3 text-xs text-slate-400">
-          <span>Layer:</span>
-          <select
-            className="focus-ring rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-white"
-            value={layer}
-            onChange={(e) => setLayer(e.target.value)}
-          >
-            <option value="precip">Precip</option>
-            <option value="aqi">AQI</option>
-            <option value="uv">UV</option>
-          </select>
-          <label className="flex items-center gap-2">
-            <span>Interval (min)</span>
+        <div className="flex flex-wrap items-center gap-2 pb-3 text-xs text-slate-400">
+          <span className="text-[11px] uppercase tracking-wide">Layer</span>
+          {['precip', 'aqi', 'uv'].map((option) => (
+            <button
+              key={option}
+              className={`chip-control ${layer === option ? 'chip-control-active' : ''}`}
+              onClick={() => setLayer(option)}
+            >
+              {option.toUpperCase()}
+            </button>
+          ))}
+          <label className="ml-1 flex items-center gap-2">
+            <span className="text-[11px] uppercase tracking-wide">Interval</span>
             <input
-              className="focus-ring w-20 rounded-xl border border-white/10 bg-slate-900 px-2 py-1 text-white"
+              className="focus-ring w-16 rounded-full border border-white/10 bg-slate-900/70 px-2 py-1 text-white"
               type="number"
               min="1"
               value={intervalMinutes}

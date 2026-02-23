@@ -3,12 +3,16 @@ import Card from '../components/Card'
 import LocationSearch from '../components/LocationSearch'
 import Skeleton from '../components/Skeleton'
 import { useLocations, useRisk, useClimateTrends } from '../hooks/queries'
+import AppIcon from '../components/AppIcon'
 
 const SeasonalInsightsPage = () => {
   const { data: locations = [] } = useLocations()
   const [selected, setSelected] = useState('tvm')
   const { data, isLoading } = useRisk(selected)
   const trendsQuery = useClimateTrends(selected)
+  const bestWindow = (trendsQuery.data || [])
+    .map((item) => ({ ...item, score: 100 - (item.rainfall || 0) * 0.2 - Math.max(0, (item.avgHigh || 0) - 33) * 2 }))
+    .sort((a, b) => b.score - a.score)[0]
 
   return (
     <div className="space-y-4">
@@ -49,6 +53,29 @@ const SeasonalInsightsPage = () => {
             })()}
           </div>
         )}
+      </Card>
+
+      <Card title="Season narrative" description="Best windows, risk windows, and readiness summary">
+        <div className="grid gap-3 md:grid-cols-3 text-sm text-slate-200">
+          <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+            <p className="section-kicker">Best window</p>
+            <p className="type-title text-white inline-flex items-center gap-1"><AppIcon name="calendar" className="h-4 w-4" />{bestWindow?.month || '—'}</p>
+            <p className="text-xs text-slate-300">Lower rain + better thermal comfort profile.</p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+            <p className="section-kicker">Risk window</p>
+            <p className="type-title text-white inline-flex items-center gap-1"><AppIcon name="alert" className="h-4 w-4" />{data && ((data.flood || 0) > 0.5 || (data.heat || 0) > 0.5) ? 'Elevated' : 'Moderate'}</p>
+            <p className="text-xs text-slate-300">Use alerts and local advisories before outdoor-heavy plans.</p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+            <p className="section-kicker">Readiness summary</p>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-white/10 px-3 py-1 inline-flex items-center gap-1"><AppIcon name="droplet" className="h-3 w-3" />Hydration</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 inline-flex items-center gap-1"><AppIcon name="shield" className="h-3 w-3" />Rain shell</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 inline-flex items-center gap-1"><AppIcon name="pulse" className="h-3 w-3" />Air quality check</span>
+            </div>
+          </div>
+        </div>
       </Card>
 
       <Card title="Historical climate" description="Monthly averages for temperature, rain, humidity">

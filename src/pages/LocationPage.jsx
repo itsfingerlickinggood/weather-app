@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import Badge from '../components/Badge'
 import Card from '../components/Card'
@@ -13,121 +13,46 @@ import {
   useRisk,
   useWeather,
 } from '../hooks/queries'
-import { useUI } from '../context/ui'
+import { resolveWeatherIcon } from '../lib/weatherIcons'
 
-const Stat = ({ label, value, tone = 'neutral' }) => (
-  <div className="panel-subtle px-3 py-2">
-    <p className="text-xs uppercase text-slate-400">{label}</p>
-    <p className={`text-lg font-semibold ${tone === 'warning' ? 'text-amber-200' : 'text-white'}`}>{value}</p>
-  </div>
-)
+const tabs = ['today', 'week', 'health', 'planning']
 
-const VisualMeter = ({ label, value = 0, suffix = '%', gradient = 'from-blue-400 to-emerald-300' }) => {
-  const width = Math.max(6, Math.min(100, value))
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-[11px] text-slate-300">
-        <span>{label}</span>
-        <span className="text-slate-50">{Math.round(value)}{suffix}</span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-        <div className={`h-full bg-gradient-to-r ${gradient}`} style={{ width: `${width}%` }} />
-      </div>
-    </div>
-  )
-}
-
-const categorizeAqi = (aqi) => {
+const aqiMeta = (aqi) => {
   if (aqi == null) return { label: 'Unknown', tone: 'neutral', tip: 'AQI unavailable.' }
-  if (aqi <= 50) return { label: 'Good', tone: 'success', tip: 'Air quality is good for all groups.' }
-  if (aqi <= 100) return { label: 'Moderate', tone: 'neutral', tip: 'Sensitive groups can proceed with brief breaks.' }
-  if (aqi <= 150) return { label: 'Unhealthy (SG)', tone: 'warning', tip: 'Limit long outdoor exposure; consider a mask.' }
-  return { label: 'Unhealthy', tone: 'danger', tip: 'Stay indoors when possible and use filtration.' }
-}
-
-const selectSky = (payload, alerts = []) => {
-  if (!payload) return ''
-  const summary = (payload.summary || '').toLowerCase()
-  if (alerts.length) return 'storm'
-  if (summary.includes('rain') || summary.includes('shower')) return 'rain'
-  if (summary.includes('storm')) return 'storm'
-  if (payload.uv > 8 || payload.temp > 35) return 'heat'
-  return 'clear'
+  if (aqi <= 50) return { label: 'Good', tone: 'success', tip: 'Air quality is good for most people.' }
+  if (aqi <= 100) return { label: 'Moderate', tone: 'neutral', tip: 'Sensitive groups should pace activity.' }
+  if (aqi <= 150) return { label: 'Unhealthy (SG)', tone: 'warning', tip: 'Limit prolonged outdoor exertion.' }
+  return { label: 'Unhealthy', tone: 'danger', tip: 'Prefer indoor plans where possible.' }
 }
 
 const buildClothingAdvice = (payload) => {
   if (!payload) return []
   const advice = []
-  if (payload.temp >= 30) advice.push('Light fabrics and breathable layers recommended.')
-  if (payload.temp <= 13) advice.push('Add a warm layer or windbreaker.')
-  if (payload.precip > 0.15) advice.push('Carry a waterproof shell or umbrella.')
-  if (payload.uv >= 7) advice.push('Use sunscreen, hat, and UV sunglasses.')
-  if (payload.aqi > 120) advice.push('Mask advised for sensitive groups (AQI elevated).')
+  if (payload.temp >= 31) advice.push('Use breathable fabrics and keep hydration handy.')
+  if (payload.temp <= 14) advice.push('Carry one warm outer layer for early/late hours.')
+  if ((payload.precip || 0) > 0.25) advice.push('Pack a waterproof shell or umbrella.')
+  if ((payload.uv || 0) >= 7) advice.push('Use SPF and a hat for daytime exposure.')
   return advice.length ? advice : ['Standard comfortable wear is fine today.']
 }
 
-const profileWeights = {
-  general: { aqi: 1, uv: 1, precip: 1, temp: 1 },
-  child: { aqi: 1.2, uv: 1.2, precip: 1, temp: 1 },
-  elderly: { aqi: 1.3, uv: 1, precip: 1.1, temp: 1.2 },
-  respiratory: { aqi: 1.5, uv: 1, precip: 1, temp: 1 },
-}
-
-const buildActivityAdvice = (payload, profile = 'general') => {
-  if (!payload) return { score: 0, summary: 'No data', suggestions: [] }
-  const weight = profileWeights[profile] || profileWeights.general
-  let score = 5
-  if (payload.aqi > 120) score -= 2 * weight.aqi
-  if (payload.uv > 8) score -= 1 * weight.uv
-  if (payload.precip > 0.25) score -= 2 * weight.precip
-  if (payload.temp < 5 || payload.temp > 35) score -= 1 * weight.temp
-  const clamped = Math.max(1, Math.min(5, Math.round(score)))
-  const suggestions = []
-  if (clamped >= 4) suggestions.push('Great for running, cycling, and outdoor sports.')
-  else if (clamped >= 3) suggestions.push('Good for walks; schedule breaks in shade.')
-  else suggestions.push('Prefer indoor activities or short outings.')
-  if (payload.uv > 7) suggestions.push('Plan for shade during mid-day hours.')
-  if (payload.aqi > 150) suggestions.push('Keep activities light to moderate due to AQI.')
-  if (profile === 'respiratory') suggestions.push('Carry a mask; avoid peak traffic corridors.')
-  return { score: clamped, summary: suggestions[0], suggestions }
-}
-
 const bestHours = (hours = []) => {
-  const scored = hours.map((h) => {
+  const scored = hours.map((hour) => {
     let score = 100
-    score -= (h.precip || 0) * 80
-    if (h.aqi > 120) score -= 20
-    if (h.uv > 7) score -= 10
-    return { ...h, score }
+    score -= (hour.precip || 0) * 70
+    if ((hour.aqi || 0) > 120) score -= 15
+    if ((hour.uv || 0) > 7) score -= 10
+    return { ...hour, score }
   })
   return scored.sort((a, b) => b.score - a.score).slice(0, 3)
 }
 
-const buildSafetyStatus = (payload, risk) => {
-  if (!payload) return { label: 'Unknown', tone: 'neutral', detail: 'No live data available.' }
-  let score = 100
-  if (payload.aqi > 150) score -= 30
-  if (payload.uv > 8) score -= 20
-  if (payload.precip > 0.35) score -= 20
-  if (payload.wind > 40) score -= 10
-  const riskScore = risk ? Math.round(((risk.flood || 0) + (risk.heat || 0) + (risk.wind || 0) + (risk.aqi || 0)) / 4 * 100) : 0
-  if (riskScore > 50) score -= 15
-  if (riskScore > 70) score -= 20
-
-  if (score >= 80) return { label: 'Safe to go outside', tone: 'success', detail: 'Great conditions for most activities.' }
-  if (score >= 60) return { label: 'Caution advised', tone: 'warning', detail: 'Stay hydrated and watch UV/AQI if sensitive.' }
-  return { label: 'Limit outdoor time', tone: 'danger', detail: 'Prefer indoor plans; monitor alerts and AQI.' }
-}
-
-const formatClock = (value) => {
-  if (!value) return '—'
-  const dt = new Date(value)
-  if (Number.isNaN(dt.getTime())) return '—'
-  return dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-}
+const tabButtonClass = (active) =>
+  `chip-control ${active ? 'chip-control-active' : ''}`
 
 const LocationPage = () => {
   const { id } = useParams()
+  const [tab, setTab] = useState('today')
+
   const locationQuery = useLocationDetail(id)
   const weatherQuery = useWeather(id)
   const hourlyQuery = useHourly(id)
@@ -136,368 +61,368 @@ const LocationPage = () => {
   const alertsQuery = useAlerts(id)
   const riskQuery = useRisk(id)
   const { favoritesQuery, addFavorite, removeFavorite } = useFavorites()
-  const { pushToast } = useUI()
-  const firedRef = useRef({})
 
-  // All useState hooks must be at the top, before any early returns
-  const [profile, setProfile] = useState('general')
-
-  // Get weather data (may be empty object if loading)
-  const weatherPayload = weatherQuery.data || {}
-
-  // All useMemo hooks must be at the top, before any early returns
+  const location = locationQuery.data
+  const payload = useMemo(() => weatherQuery.data || {}, [weatherQuery.data])
   const isFavorite = useMemo(() => favoritesQuery.data?.includes(id), [favoritesQuery.data, id])
-  const aqiMeta = useMemo(() => categorizeAqi(weatherPayload?.aqi), [weatherPayload?.aqi])
-  const activityMeta = useMemo(() => buildActivityAdvice(weatherPayload, profile), [profile, weatherPayload])
-  const clothingAdvice = useMemo(() => buildClothingAdvice(weatherPayload), [weatherPayload])
-  const safety = useMemo(() => buildSafetyStatus(weatherPayload, riskQuery.data), [riskQuery.data, weatherPayload])
+  const isNum = (value) => typeof value === 'number' && Number.isFinite(value)
+  const oneDec = (value) => (isNum(value) ? value.toFixed(1) : '—')
+  const zeroDec = (value) => (isNum(value) ? Math.round(value) : '—')
+  const icon = resolveWeatherIcon({
+    summary: payload.summary,
+    weathercode: payload.weathercode,
+    precip: payload.precip,
+    cloudCover: payload.cloudCover,
+    wind: payload.wind,
+    uv: payload.uv,
+    temp: payload.temp,
+  })
+  const aqi = aqiMeta(payload.aqi)
+  const clothing = useMemo(() => buildClothingAdvice(payload), [payload])
+  const best = useMemo(() => bestHours(hourlyQuery.data || []), [hourlyQuery.data])
+  const riskBreakdown = useMemo(
+    () => [
+      { label: 'Flood', value: riskQuery.data?.flood },
+      { label: 'Heat', value: riskQuery.data?.heat },
+      { label: 'Wind', value: riskQuery.data?.wind },
+      { label: 'AQI', value: riskQuery.data?.aqi },
+    ],
+    [riskQuery.data],
+  )
+  const compositeRisk = useMemo(() => {
+    const values = riskBreakdown.map((item) => item.value).filter((value) => typeof value === 'number')
+    if (!values.length) return null
+    return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 100)
+  }, [riskBreakdown])
+  const uvAdvice = (payload.uv || 0) > 7 ? 'High-UV period likely at midday.' : 'Moderate UV profile.'
 
-  const locationFallback = useMemo(() => {
-    if (!weatherPayload?.locationMeta) return null
-    return {
-      name: weatherPayload.locationMeta.name,
-      region: [weatherPayload.locationMeta.region, weatherPayload.locationMeta.country].filter(Boolean).join(', '),
-      lat: weatherPayload.locationMeta.lat,
-      lon: weatherPayload.locationMeta.lon,
-      tags: ['Live city'],
-      zone: weatherPayload.locationMeta.region || weatherPayload.locationMeta.country || 'Live city',
-    }
-  }, [weatherPayload?.locationMeta])
-
-  const locationData = locationQuery.data || locationFallback
-
-  // All useEffect hooks must be at the top, before any early returns
-  useEffect(() => {
-    if (!weatherPayload || !Object.keys(weatherPayload).length) return
-    const fireOnce = (key, msg, tone) => {
-      if (firedRef.current[key]) return
-      firedRef.current[key] = true
-      pushToast(msg, tone)
-    }
-    if (weatherPayload.uv >= 8) fireOnce('uv', 'High UV right now – cover up.', 'warning')
-    if (weatherPayload.aqi >= 150) fireOnce('aqi', 'AQI is unhealthy; consider masking.', 'danger')
-    if (hourlyQuery.data?.some((h) => h.precip > 0.3)) fireOnce('rain', 'Rain expected soon – keep a shell handy.', 'warning')
-  }, [hourlyQuery.data, pushToast, weatherPayload])
-
-  useEffect(() => {
-    const variant = selectSky(weatherPayload, alertsQuery.data)
-    if (variant) document.body.dataset.sky = variant
-    return () => {
-      document.body.dataset.sky = ''
-    }
-  }, [alertsQuery.data, weatherPayload])
-
-  const toggleFavorite = () => {
-    if (isFavorite) {
-      removeFavorite.mutate(id)
-    } else {
-      addFavorite.mutate(id)
-    }
-  }
-
-  // Early returns for loading/error states - AFTER all hooks
   if (locationQuery.isLoading || weatherQuery.isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10" />
         <Skeleton className="h-40" />
-        <Skeleton className="h-20" />
+        <Skeleton className="h-28" />
       </div>
     )
   }
 
-  if ((!locationData && locationQuery.error) || weatherQuery.error) {
+  if (!location && (locationQuery.error || weatherQuery.error)) {
     return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm">Unable to load location.</div>
   }
 
-  // Derived values (not hooks, so they can be after early returns)
-  const offline = weatherQuery.data?.offline
-  const cloudCoverPct = Math.round(Math.max(0, Math.min(100, (weatherPayload?.cloudCover ?? 0) * 100)))
-  const comfortIndex = weatherPayload?.comfortIndex ?? 70
-  const rainStreak = weatherPayload?.rainStreakDays ?? 0
-  const seaTemp = weatherPayload?.seaTemp
-  const feelsLike = weatherPayload?.feelsLike ?? weatherPayload?.temp
-  const seaMeter = seaTemp ? Math.min(100, Math.max(0, (seaTemp - 20) * 5)) : 0
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <section className="space-y-1">
-        <p className="section-kicker">Location view</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">{locationData?.name}</h1>
-        <p className="text-sm text-slate-400">{locationData?.region} · Lat {locationData?.lat} / Lon {locationData?.lon}</p>
+        <p className="section-kicker">Location</p>
+        <h1 className="type-display tracking-tight text-slate-50">{location?.name}</h1>
+        <p className="type-body text-slate-400">{location?.region} · Lat {location?.lat} / Lon {location?.lon}</p>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {locationData?.zone ? <Badge tone="neutral" label={locationData.zone} /> : null}
-            {(locationData?.tags || []).map((tag) => (
-              <span key={tag} className="rounded-full bg-white/10 px-3 py-1 text-[11px] text-slate-100">
-                {tag}
-              </span>
-            ))}
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={weatherQuery.data?.offline ? 'warning' : 'success'} label={weatherQuery.data?.offline ? 'Offline cache' : 'Live'} />
+          {location?.zone ? <Badge tone="neutral" label={location.zone} /> : null}
+          <Badge tone={aqi.tone} label={`AQI ${payload.aqi ?? '—'}`} />
         </div>
-        <div className="flex items-center gap-2">
-          <Badge tone={offline ? 'warning' : 'success'} label={offline ? 'Offline cache' : 'Live'} />
+        <button
+          className="focus-ring rounded-full bg-blue-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          onClick={() => (isFavorite ? removeFavorite.mutate(id) : addFavorite.mutate(id))}
+          disabled={addFavorite.isPending || removeFavorite.isPending || favoritesQuery.isLoading}
+        >
+          {isFavorite ? 'Unfavorite' : 'Favorite'}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Location sections">
+        {tabs.map((item) => (
           <button
-            className="focus-ring rounded-full bg-blue-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            onClick={toggleFavorite}
-            disabled={addFavorite.isPending || removeFavorite.isPending || favoritesQuery.isLoading}
+            key={item}
+            role="tab"
+            id={`tab-${item}`}
+            aria-selected={tab === item}
+            aria-controls={`panel-${item}`}
+            className={tabButtonClass(tab === item)}
+            onClick={() => setTab(item)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                setTab(item)
+              }
+            }}
           >
-            {isFavorite ? 'Unfavorite' : 'Favorite'}
+            {item === 'today' ? 'Today' : item === 'week' ? 'Week' : item === 'health' ? 'Health' : 'Planning'}
           </button>
-        </div>
+        ))}
       </div>
 
-      <Card title="Current conditions" description="Real-time snapshot + cached fallback">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="panel-subtle space-y-2">
-            <p className="metric-value text-white">{weatherPayload?.temp}°C</p>
-            <p className="text-sm text-slate-300">{weatherPayload?.summary}</p>
-            <p className="text-xs text-slate-400">Updated {new Date(weatherPayload?.currentTime).toLocaleTimeString()}</p>
-          </div>
-          <div className="space-y-2">
-            <Stat label="AQI" value={weatherPayload?.aqi} tone={weatherPayload?.aqi > 80 ? 'warning' : 'neutral'} />
-            <Stat label="UV" value={weatherPayload?.uv} tone={weatherPayload?.uv > 7 ? 'warning' : 'neutral'} />
-          </div>
-          <div className="space-y-2">
-            <Stat label="Wind" value={`${weatherPayload?.wind} km/h`} />
-            <Stat label="Humidity" value={`${weatherPayload?.humidity}%`} />
-          </div>
-        </div>
-        <p className="text-xs text-slate-400">AQI {aqiMeta.label}: {aqiMeta.tip}</p>
-      </Card>
-
-      <Card title="Outdoor safety status" description="Blends AQI, UV, precip, and disaster risk">
-        <div className="flex flex-col gap-2 rounded-xl border border-white/5 bg-slate-900/60 p-3 text-sm text-slate-200">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={safety.tone} label={safety.label} />
-            {riskQuery.isLoading ? <span className="text-xs text-slate-400">Loading risk…</span> : <span className="text-xs text-slate-400">Risk score {riskQuery.data ? Math.round(((riskQuery.data.flood || 0) + (riskQuery.data.heat || 0) + (riskQuery.data.wind || 0) + (riskQuery.data.aqi || 0)) / 4 * 100) : '—'}/100</span>}
-          </div>
-          <p className="text-slate-300">{safety.detail}</p>
-          <p className="text-[11px] text-slate-400">Factors: AQI {weatherPayload?.aqi}, UV {weatherPayload?.uv}, precip {Math.round((weatherPayload?.precip || 0) * 100)}%, wind {weatherPayload?.wind} km/h.</p>
-        </div>
-      </Card>
-
-      <Card title="Kerala visual board" description="Read the day through gauges and cues, not walls of text">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4">
-            <p className="text-[11px] uppercase text-slate-400">Thermal feel</p>
-              <p className="text-3xl font-semibold text-white">{feelsLike}°C</p>
-            <p className="text-xs text-slate-400">Actual {weatherPayload?.temp}°C • Feels driven by humidity</p>
-            <div className="mt-3 space-y-2">
-              <VisualMeter label="Comfort index" value={comfortIndex} suffix="/100" gradient="from-amber-300 to-pink-400" />
-              <VisualMeter label="Humidity" value={weatherPayload?.humidity ?? 0} />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4">
-            <p className="text-[11px] uppercase text-slate-400">Moisture + monsoon</p>
-            <div className="space-y-2 text-sm text-slate-200">
-              <VisualMeter label="Cloud cover" value={cloudCoverPct} />
-              <VisualMeter label="Rain streak" value={Math.min(100, rainStreak * 20)} suffix="%" gradient="from-blue-400 to-emerald-300" />
-              <p className="text-[11px] text-amber-100">{weatherPayload?.monsoonPhase || 'Stable phase today'}</p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4">
-            <p className="text-[11px] uppercase text-slate-400">Sun & water</p>
-            <div className="space-y-2 text-sm text-slate-200">
-              <p className="flex items-center gap-2"><span>🌅</span><span>Sunrise {formatClock(weatherPayload?.sunrise)}</span></p>
-              <p className="flex items-center gap-2"><span>🌇</span><span>Sunset {formatClock(weatherPayload?.sunset)}</span></p>
-              <VisualMeter label="Sea warmth" value={seaMeter} suffix="%" gradient="from-cyan-300 to-blue-400" />
-              <div className="flex flex-wrap gap-2 text-[11px] text-slate-100">
-                {seaTemp ? <span className="rounded-full bg-white/10 px-2 py-1">Sea {seaTemp}°C</span> : null}
-                {weatherPayload?.dewPoint ? <span className="rounded-full bg-white/10 px-2 py-1">Dew {weatherPayload.dewPoint}°C</span> : null}
-                {weatherPayload?.visibility ? <span className="rounded-full bg-white/10 px-2 py-1">{weatherPayload.visibility} km vis</span> : null}
+      {tab === 'today' ? (
+        <div role="tabpanel" id="panel-today" aria-labelledby="tab-today" className="space-y-4">
+          <Card title="Current" description="Primary conditions now">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="panel-subtle card-elevated space-y-1">
+                <img src={icon} alt={payload.summary || 'Weather icon'} className="h-10 w-10 rounded-lg object-cover" />
+                <p className="type-display text-white">{payload.temp ?? '—'}°C</p>
+                <p className="type-body text-slate-300">{payload.summary || 'Conditions unavailable'}</p>
+              </div>
+              <div className="panel-subtle space-y-2 md:col-span-2">
+                <p className="section-kicker">Current metrics</p>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {[
+                    { label: 'Feels like', value: `${oneDec(payload.feelsLike ?? payload.temp)}°C`, iconSrc: '/icons/weather/sunny.png' },
+                    { label: 'Humidity', value: `${zeroDec(payload.humidity)}%`, iconSrc: '/icons/weather/cloud.png' },
+                    { label: 'Dew point', value: `${oneDec(payload.dewPoint)}°C`, iconSrc: '/icons/weather/foggy-pier.png' },
+                    { label: 'Pressure', value: `${zeroDec(payload.pressure)} hPa`, iconSrc: '/icons/weather/earth.png' },
+                    {
+                      label: 'Wind',
+                      value: `${oneDec(payload.wind)} km/h${isNum(payload.windDirection) ? ` (${Math.round(payload.windDirection)}°)` : ''}`,
+                      iconSrc: '/icons/weather/wind.png',
+                    },
+                    { label: 'Gusts', value: `${zeroDec(payload.windGusts)} km/h`, iconSrc: '/icons/weather/desert-wind-farm.png' },
+                    { label: 'Visibility', value: `${oneDec(payload.visibility)} km`, iconSrc: '/icons/weather/cloudless-sulphur.png' },
+                    { label: 'UV', value: `${oneDec(payload.uv)}`, iconSrc: '/icons/weather/sun.png' },
+                    { label: 'Solar', value: `${zeroDec(payload.solarRad)} W/m²`, iconSrc: '/icons/weather/aztec-sun-stone.png' },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                        <img src={item.iconSrc} alt="" aria-hidden="true" className="h-6 w-6 rounded object-cover" loading="eager" decoding="async" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-slate-400">{item.label}</p>
+                        <p className="truncate text-[13px] font-semibold text-slate-100">{item.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="panel-subtle space-y-1 text-sm text-slate-200">
+                <p className="section-kicker">Alert status</p>
+                {alertsQuery.data?.length ? (
+                  <>
+                    <Badge tone="warning" label={alertsQuery.data[0].severity} />
+                    <p>{alertsQuery.data[0].title}</p>
+                  </>
+                ) : (
+                  <p className="text-slate-300">No active alerts right now.</p>
+                )}
               </div>
             </div>
-          </div>
-        </div>
-      </Card>
+          </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card title="Next hours" description="Hourly temp + rain chance">
-          {hourlyQuery.isLoading ? (
-            <Skeleton className="h-24" />
-          ) : (
-            <div role="list" className="grid grid-cols-3 gap-2 text-sm">
-              {(hourlyQuery.data || []).slice(0, 9).map((h) => (
-                <div key={h.hour} role="listitem" className="rounded-xl border border-white/5 bg-slate-900/50 p-3">
-                  <p className="text-xs text-slate-400">+{h.hour}h</p>
-                  <p className="font-semibold text-white">{h.temp}\u00b0C</p>
-                  <p className="text-[11px] text-slate-400">Rain {Math.round((h.precip || 0) * 100)}%</p>
+          <Card title="Next 24 hours" description="Hourly conditions and best windows">
+            {hourlyQuery.isLoading ? (
+              <Skeleton className="h-24" />
+            ) : (
+              <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 md:grid-cols-6 text-sm">
+                  {(hourlyQuery.data || []).slice(0, 12).map((hour) => (
+                    <div key={hour.hour} className="rounded-xl border border-white/5 bg-slate-900/50 p-2 text-slate-200">
+                      <p className="text-[11px] text-slate-400">+{hour.hour}h</p>
+                      <p className="font-semibold text-white">{hour.temp}°C</p>
+                      <p className="text-[11px] text-slate-400">Rain {Math.round((hour.precip || 0) * 100)}%</p>
+                      {hour.wind != null && <p className="text-[11px] text-slate-400">Wind {hour.wind} km/h</p>}
+                      {hour.uv != null && <p className="text-[11px] text-amber-300">UV {hour.uv}</p>}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-        <Card title="Next 3 days" description="High / Low / Precip">
-          {forecastQuery.isLoading ? (
-            <Skeleton className="h-24" />
-          ) : (
-            <div className="divide-y divide-white/5 text-sm">
-              {(forecastQuery.data || []).map((day) => (
-                <div key={day.day} className="flex items-center justify-between py-2">
-                  <span className="text-slate-200">{day.day}</span>
-                  <span className="text-slate-300">{day.high}\u00b0 / {day.low}\u00b0</span>
-                  <span className="text-amber-200">{Math.round(day.precip * 100)}% precip</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <Card title="7-day graph" description="Trend view for the next week">
-        {extendedForecastQuery.isLoading ? (
-          <Skeleton className="h-24" />
-        ) : (
-          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {(extendedForecastQuery.data || []).slice(0, 7).map((day) => (
-              <div key={day.day} className="rounded-xl border border-white/5 bg-slate-900/60 p-3 text-sm text-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white">{day.day}</span>
-                  <span className="text-slate-300">{day.high}° / {day.low}°</span>
-                </div>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/5">
-                  <div className="h-full bg-gradient-to-r from-emerald-400 to-blue-500" style={{ width: `${Math.min(100, Math.max(15, (day.high || 0) / 1.5))}%` }} />
-                </div>
-                <p className="text-[11px] text-slate-400">Precip {Math.round((day.precip || 0) * 100)}% • Humidity trend steady</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card title="Alerts" description="Live environmental alerts">
-          {alertsQuery.isLoading ? (
-            <Skeleton className="h-20" />
-          ) : alertsQuery.data?.length ? (
-            <ul className="space-y-2">
-              {alertsQuery.data.map((alert) => (
-                <li key={alert.id} className="rounded-lg border border-white/5 bg-amber-500/10 p-3 text-sm text-amber-50">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold">{alert.title}</span>
-                    <Badge tone="warning" label={alert.severity} />
+                <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-sm text-slate-200">
+                  <p className="section-kicker">Best outdoor windows</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {best.map((hour) => (
+                      <span key={`best-${hour.hour}`} className="rounded-full bg-white/10 px-3 py-1 text-xs">
+                        +{hour.hour}h · {hour.temp}°C
+                      </span>
+                    ))}
                   </div>
-                  <p className="text-amber-100/80">{alert.detail}</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-slate-400">No active alerts.</p>
-          )}
-        </Card>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      ) : null}
 
-        <Card title="Disaster risk" description="Composite risk score">
-          {riskQuery.isLoading ? (
-            <Skeleton className="h-20" />
-          ) : (
-            <div className="space-y-2 text-sm text-slate-200">
-              <p className="text-lg font-semibold text-white">Score {riskQuery.data ? Math.round(((riskQuery.data.flood || 0) + (riskQuery.data.heat || 0) + (riskQuery.data.wind || 0) + (riskQuery.data.aqi || 0)) / 4 * 100) : '—'}/100</p>
-              <div className="grid grid-cols-2 gap-1 text-xs text-slate-300">
-                {riskQuery.data ? [
-                  ['Flood', riskQuery.data.flood],
-                  ['Heat', riskQuery.data.heat],
-                  ['Wind', riskQuery.data.wind],
-                  ['AQI', riskQuery.data.aqi],
-                ].map(([label, val]) => (
-                  <span key={label}>{label}: {val != null ? Math.round(val * 100) : '—'}%</span>
-                )) : null}
+      {tab === 'week' ? (
+        <div role="tabpanel" id="panel-week" aria-labelledby="tab-week" className="space-y-4">
+          <Card title="Next 7 days" description="High / low and rain signal">
+            {forecastQuery.isLoading ? (
+              <Skeleton className="h-24" />
+            ) : (
+              <div className="divide-y divide-white/5 text-sm">
+                {(forecastQuery.data || []).map((day) => (
+                  <div key={day.day} className="grid gap-1 py-2 text-slate-200 md:grid-cols-[1fr_auto_auto] md:items-center md:gap-3">
+                    <span className="font-semibold text-white">{day.day}</span>
+                    <span>{day.high}° / {day.low}°</span>
+                    <span className="text-[11px] text-amber-200">{Math.round((day.precip || 0) * 100)}% precip</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="14-day outlook" description="Extended signal for planning confidence">
+            {extendedForecastQuery.isLoading ? (
+              <Skeleton className="h-24" />
+            ) : (
+              (() => {
+                const days = (extendedForecastQuery.data || []).slice(0, 14)
+                if (!days.length) return <p className="text-sm text-slate-400">No extended outlook available.</p>
+
+                const wetDays = days.filter((day) => (day.precip || 0) >= 0.35).length
+                const hotDays = days.filter((day) => day.high >= 35).length
+                const avgHigh = Math.round(days.reduce((sum, day) => sum + day.high, 0) / days.length)
+
+                return (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 sm:grid-cols-3 text-xs">
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-slate-300">
+                        Avg high <span className="ml-1 font-semibold text-white">{avgHigh}°C</span>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-slate-300">
+                        Rain-prone days <span className="ml-1 font-semibold text-cyan-200">{wetDays}</span>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-slate-300">
+                        Hot days <span className="ml-1 font-semibold text-amber-200">{hotDays}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {days.map((day, index) => {
+                        const precipPct = Math.round((day.precip || 0) * 100)
+                        const rainTone = precipPct >= 60 ? 'text-cyan-200' : precipPct >= 25 ? 'text-sky-200' : 'text-slate-300'
+                        const tempTone = day.high >= 35 ? 'text-amber-200' : 'text-slate-100'
+                        const prediction = precipPct >= 60
+                          ? 'Rain-heavy day expected'
+                          : precipPct >= 25
+                            ? 'Passing showers likely'
+                            : day.high >= 35
+                              ? 'Hot and mostly dry'
+                              : 'Stable outdoor window'
+                        return (
+                          <div key={`${day.day}-${index}`} className="rounded-xl border border-white/10 bg-slate-900/55 px-3 py-2 text-sm text-slate-200">
+                            <div className="grid items-center gap-2 md:grid-cols-[52px_1fr_auto]">
+                              <span className="font-semibold text-white">{day.day}</span>
+                              <div>
+                                <p className={tempTone}>{day.high}° / {day.low}°</p>
+                                <div className="mt-1 h-1.5 rounded-full bg-slate-800">
+                                  <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" style={{ width: `${precipPct}%` }} />
+                                </div>
+                                <p className="mt-1 text-[11px] text-slate-400">Forecast: {prediction}</p>
+                              </div>
+                              <span className={`text-xs ${rainTone}`}>Precip {precipPct}%</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()
+            )}
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === 'health' ? (
+        <div role="tabpanel" id="panel-health" aria-labelledby="tab-health" className="space-y-4">
+          <Card title="Health Center" description="AQI, UV, and risk synthesis">
+            <div className="grid gap-3 lg:grid-cols-3 text-sm text-slate-200">
+              <div className="panel-subtle space-y-2">
+                <p className="section-kicker">Air quality</p>
+                <div className="flex items-center gap-2">
+                  <img src="/icons/weather/health.png" alt="" aria-hidden="true" className="h-8 w-8 rounded object-cover" />
+                  <p className="type-title text-white">{aqi.label}</p>
+                </div>
+                <p className="text-slate-300">{aqi.tip}</p>
+                <div className="space-y-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                  <p>PM2.5 {payload.pm25 != null ? payload.pm25.toFixed(1) : '—'} · PM10 {payload.pm10?.toFixed(1) ?? '—'} µg/m³</p>
+                  <p>NO₂ {payload.no2 != null ? payload.no2.toFixed(1) : '—'} · O₃ {payload.o3?.toFixed(1) ?? '—'} µg/m³</p>
+                </div>
+              </div>
+              <div className="panel-subtle space-y-2">
+                <p className="section-kicker">UV guidance</p>
+                <div className="flex items-center gap-2">
+                  <img src="/icons/weather/sun.png" alt="" aria-hidden="true" className="h-8 w-8 rounded object-cover" />
+                  <p className="type-title text-white">UV {payload.uv ?? '—'}</p>
+                </div>
+                <p className="text-slate-300">{uvAdvice}</p>
+                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                  <p>Solar {payload.solarRad != null ? `${payload.solarRad} W/m²` : '—'}</p>
+                </div>
+              </div>
+              <div className="panel-subtle space-y-2">
+                <p className="section-kicker">Atmospheric</p>
+                <div className="space-y-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                  <p>{payload.pressure != null ? `${Math.round(payload.pressure)} hPa` : '—'}</p>
+                  <p>
+                    CAPE {payload.cape != null ? Math.round(payload.cape) : '—'} J/kg{' '}
+                    {payload.cape > 1000 ? '⚡ Storm risk' : payload.cape > 500 ? '⚡ Possible' : '✓ Stable'}
+                  </p>
+                  <p>Cloud: {payload.cloudLow ?? '—'}% low · {payload.cloudMid ?? '—'}% mid · {payload.cloudHigh ?? '—'}% high</p>
+                  <p>Vis {payload.visibility != null ? payload.visibility : '—'} km · Dew {payload.dewPoint != null ? `${payload.dewPoint}°C` : '—'}</p>
+                </div>
               </div>
             </div>
-          )}
-        </Card>
-      </div>
-
-      <Card title="14-day outlook" description="Extended temps and precipitation trend">
-        {extendedForecastQuery.isLoading ? (
-          <Skeleton className="h-28" />
-        ) : (
-          <div className="grid max-h-80 gap-2 overflow-y-auto pr-1 md:grid-cols-2">
-            {extendedForecastQuery.data?.map((day, idx) => (
-              <div key={`${day.day}-${idx}`} className="rounded-xl border border-white/5 bg-slate-900/50 p-3 text-sm text-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white">{day.day}</span>
-                  <span className="text-slate-300">{day.high}° / {day.low}°</span>
-                </div>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/5">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-400 to-amber-300"
-                    style={{ width: `${Math.min(100, Math.max(20, (day.high || 0) / 1.2))}%` }}
-                  />
-                </div>
-                <p className="text-xs text-slate-400">Precip {Math.round((day.precip || 0) * 100)}% • Trend {idx === 0 ? 'start' : day.high >= extendedForecastQuery.data?.[idx - 1]?.high ? 'warming' : 'cooling'}</p>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[260px_1fr] text-sm text-slate-200">
+              <div className="panel-subtle space-y-2">
+                <p className="section-kicker">Composite risk</p>
+                <p className="type-title text-white">{compositeRisk != null ? compositeRisk : '—'}/100</p>
+                <p className="text-slate-300">Use alerts + AQI for go/no-go activity decisions.</p>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card title="Clothing guide" description="AI-lite recommendations based on conditions">
-          <ul className="space-y-2 text-sm text-slate-200">
-            {clothingAdvice.map((tip, idx) => (
-              <li key={idx} className="rounded-lg border border-white/5 bg-slate-900/50 p-2">
-                {tip}
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card title="Activity suitability" description="Scores adapt to AQI, UV, precip">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-            <span>Profile:</span>
-            {['general', 'child', 'elderly', 'respiratory'].map((p) => (
-              <button
-                key={p}
-                className={`focus-ring rounded-full px-3 py-1 ${profile === p ? 'bg-blue-500 text-white' : 'bg-white/10 text-slate-100'}`}
-                onClick={() => setProfile(p)}
-                type="button"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          <div className="space-y-3 text-sm text-slate-200">
-            <div className="flex items-center gap-2">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <span
-                  key={step}
-                  className={`h-2 flex-1 rounded-full ${step <= activityMeta.score ? 'bg-emerald-400' : 'bg-white/10'}`}
-                  aria-label={step <= activityMeta.score ? 'Suitable' : 'Less suitable'}
-                />
-              ))}
-              <span className="text-xs text-slate-400">Score {activityMeta.score}/5</span>
+              <div className="panel-subtle space-y-2">
+                <p className="section-kicker">Risk breakdown</p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {riskBreakdown.map((item) => {
+                    const pct = item.value != null ? Math.round(item.value * 100) : null
+                    return (
+                      <div key={item.label} className="rounded-xl border border-white/10 bg-white/5 p-2">
+                        <div className="mb-1 flex items-center justify-between text-xs">
+                          <span className="text-slate-300">{item.label}</span>
+                          <span className="font-semibold text-white">{pct != null ? `${pct}%` : '—'}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-800">
+                          <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" style={{ width: `${pct != null ? pct : 0}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
-            <p className="font-semibold text-white">{activityMeta.summary}</p>
-            <ul className="space-y-1 text-xs text-slate-300">
-              {activityMeta.suggestions.map((line, idx) => (
-                <li key={idx}>{line}</li>
-              ))}
-            </ul>
-          </div>
-        </Card>
-      </div>
+          </Card>
+        </div>
+      ) : null}
 
-      <Card title="Best hours today" description="Pick the top windows for outdoor plans">
-        {hourlyQuery.isLoading ? (
-          <Skeleton className="h-16" />
-        ) : (
-          <div className="grid gap-2 md:grid-cols-3">
-            {bestHours(hourlyQuery.data || []).map((h) => (
-              <div key={h.hour} className="rounded-xl border border-white/5 bg-slate-900/60 p-3 text-sm text-slate-200">
-                <p className="text-xs text-slate-400">+{h.hour}h</p>
-                <p className="font-semibold text-white">{h.temp}°C</p>
-                <p className="text-[11px] text-emerald-200">Rain {Math.round((h.precip || 0) * 100)}%</p>
+      {tab === 'planning' ? (
+        <div role="tabpanel" id="panel-planning" aria-labelledby="tab-planning" className="space-y-4">
+          <Card title="Clothing and activity" description="Simple outfit and schedule guidance">
+            <div className="grid gap-3 lg:grid-cols-2 text-sm text-slate-200">
+              <div className="panel-subtle space-y-2">
+                <p className="section-kicker">What to wear</p>
+                <ul className="space-y-1.5">
+                  {clothing.map((line) => (
+                    <li key={line} className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
+                      <img src="/icons/weather/backpack-rain-cover.png" alt="" aria-hidden="true" className="mt-0.5 h-4 w-4 rounded object-cover" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              <div className="panel-subtle space-y-2">
+                <p className="section-kicker">Plan windows</p>
+                <p className="text-slate-300">Best slots are based on lower rain, AQI, and UV values.</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {best.map((hour) => (
+                    <div key={`plan-${hour.hour}`} className="rounded-xl border border-white/10 bg-white/5 p-2 text-xs">
+                      <p className="font-semibold text-white">+{hour.hour}h</p>
+                      <p className="text-slate-300">{hour.temp}°C</p>
+                      <p className="text-slate-400">Rain {Math.round((hour.precip || 0) * 100)}%</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -1,8 +1,6 @@
 import { fetchWeatherApi } from './liveWeather'
 
 const GEOCODE_CACHE_KEY = 'kerala-geo-v1'
-const WEATHER_CACHE_PREFIX = 'kerala-weather-'
-const WEATHER_CACHE_TTL = 1000 * 60 * 10 // 10 minutes
 const DYNAMIC_LOC_KEY = 'dynamic-locs-v1'
 
 const districtCatalog = [
@@ -408,26 +406,6 @@ export const getLocationById = async (id) => {
   return found
 }
 
-const loadWeatherCache = (id) => {
-  try {
-    const raw = localStorage.getItem(WEATHER_CACHE_PREFIX + id)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (parsed?.ts && Date.now() - parsed.ts < WEATHER_CACHE_TTL) return parsed.data
-    return null
-  } catch {
-    return null
-  }
-}
-
-const saveWeatherCache = (id, data) => {
-  try {
-    localStorage.setItem(WEATHER_CACHE_PREFIX + id, JSON.stringify({ data, ts: Date.now() }))
-  } catch {
-    // ignore
-  }
-}
-
 const retry = async (fn, attempts = 10) => {
   let lastError
   for (let i = 0; i < attempts; i += 1) {
@@ -444,14 +422,46 @@ const fetchWeatherRaw = async (lat, lon) => {
   const params = new URLSearchParams({
     latitude: lat,
     longitude: lon,
-    current: ['temperature_2m', 'apparent_temperature', 'relative_humidity_2m', 'wind_speed_10m', 'precipitation', 'cloud_cover', 'uv_index', 'weathercode'].join(','),
-    hourly: ['temperature_2m', 'relative_humidity_2m', 'uv_index', 'precipitation_probability', 'precipitation', 'cloud_cover', 'wind_speed_10m', 'weathercode'].join(','),
-    daily: ['temperature_2m_max', 'temperature_2m_min', 'precipitation_probability_max', 'sunrise', 'sunset', 'uv_index_max', 'weathercode'].join(','),
+    current: [
+      'temperature_2m', 'apparent_temperature', 'relative_humidity_2m',
+      'dew_point_2m', 'pressure_msl', 'surface_pressure',
+      'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m',
+      'precipitation', 'rain', 'snowfall', 'weathercode',
+      'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high',
+      'uv_index', 'visibility', 'is_day', 'shortwave_radiation', 'cape',
+    ].join(','),
+    hourly: [
+      'temperature_2m', 'apparent_temperature', 'relative_humidity_2m',
+      'dew_point_2m', 'precipitation_probability', 'precipitation', 'rain', 'snowfall',
+      'weathercode', 'cloud_cover', 'visibility',
+      'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m',
+      'uv_index', 'shortwave_radiation', 'cape', 'vapour_pressure_deficit', 'is_day',
+    ].join(','),
+    daily: [
+      'temperature_2m_max', 'temperature_2m_min',
+      'precipitation_sum', 'precipitation_probability_max', 'rain_sum', 'snowfall_sum',
+      'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant',
+      'sunrise', 'sunset', 'uv_index_max', 'shortwave_radiation_sum', 'weathercode',
+    ].join(','),
     forecast_days: 14,
     timezone: 'auto',
   })
   const res = await retry(() => fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`))
   if (!res.ok) throw new Error('Weather fetch failed')
+  return res.json()
+}
+
+const fetchAirQualityRaw = async (lat, lon) => {
+  const params = new URLSearchParams({
+    latitude: lat,
+    longitude: lon,
+    current: ['us_aqi', 'european_aqi', 'pm2_5', 'pm10', 'carbon_monoxide', 'nitrogen_dioxide', 'sulphur_dioxide', 'ozone'].join(','),
+    hourly: ['us_aqi', 'pm2_5', 'pm10', 'ozone', 'nitrogen_dioxide'].join(','),
+    timezone: 'auto',
+    forecast_days: 1,
+  })
+  const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${params.toString()}`)
+  if (!res.ok) return null
   return res.json()
 }
 
@@ -465,25 +475,45 @@ const mapWeather = (raw, location) => {
   const daily = raw.daily || {}
   const hourly = raw.hourly || {}
 
+  const wcode = current.weathercode ?? current.weather_code
   const weather = {
     locationId: location.id,
     temp: current.temperature_2m,
     feelsLike: current.apparent_temperature,
     humidity: current.relative_humidity_2m,
+    dewPoint: current.dew_point_2m ?? null,
+    pressure: current.pressure_msl ?? current.surface_pressure ?? null,
     wind: current.wind_speed_10m,
+    windDirection: current.wind_direction_10m ?? null,
+    windGusts: current.wind_gusts_10m ?? null,
     precip: typeof current.precipitation === 'number' ? current.precipitation : 0,
+    rain: current.rain ?? 0,
+    snowfall: current.snowfall ?? 0,
     cloudCover: typeof current.cloud_cover === 'number' ? current.cloud_cover / 100 : null,
+    cloudLow: typeof current.cloud_cover_low === 'number' ? current.cloud_cover_low : null,
+    cloudMid: typeof current.cloud_cover_mid === 'number' ? current.cloud_cover_mid : null,
+    cloudHigh: typeof current.cloud_cover_high === 'number' ? current.cloud_cover_high : null,
     uv: current.uv_index,
-    summary: weatherCodeSummary[current.weathercode] || 'Weather',
-    weathercode: current.weathercode,
+    visibility: typeof current.visibility === 'number' ? Math.round(current.visibility / 1000 * 10) / 10 : null, // convert m→km
+    isDay: current.is_day ?? 1,
+    solarRad: current.shortwave_radiation ?? null,
+    cape: current.cape ?? null,
+    aqi: null, // filled from air quality API in getWeatherBundle
+    europeanAqi: null,
+    pm25: null,
+    pm10: null,
+    no2: null,
+    so2: null,
+    o3: null,
+    co: null,
+    summary: weatherCodeSummary[wcode] || 'Weather',
+    weathercode: wcode,
     currentTime: current.time,
     sunrise: daily.sunrise?.[0],
     sunset: daily.sunset?.[0],
     rainStreakDays: 0,
     comfortIndex: current.relative_humidity_2m ? Math.max(50, 100 - current.relative_humidity_2m) : 70,
-    visibility: null,
     seaTemp: null,
-    dewPoint: null,
     locationMeta: {
       name: location.name,
       region: location.region,
@@ -496,13 +526,32 @@ const mapWeather = (raw, location) => {
   const hourlyData = []
   const limit = Math.min(24, hourly.time?.length || 0)
   for (let i = 0; i < limit; i += 1) {
+    const hcode = hourly.weathercode?.[i] ?? hourly.weather_code?.[i]
     hourlyData.push({
       hour: i + 1,
+      time: hourly.time?.[i],
       temp: hourly.temperature_2m?.[i],
-      aqi: null,
+      feelsLike: hourly.apparent_temperature?.[i] ?? null,
+      humidity: hourly.relative_humidity_2m?.[i] ?? null,
+      dewPoint: hourly.dew_point_2m?.[i] ?? null,
+      aqi: null, // filled from air quality API
+      pm25: null,
       uv: hourly.uv_index?.[i],
       precip: (hourly.precipitation_probability?.[i] || 0) / 100,
+      precipMm: hourly.precipitation?.[i] ?? 0,
+      rain: hourly.rain?.[i] ?? 0,
+      snowfall: hourly.snowfall?.[i] ?? 0,
       cloud: (hourly.cloud_cover?.[i] || 0) / 100,
+      wind: hourly.wind_speed_10m?.[i] ?? null,
+      windDirection: hourly.wind_direction_10m?.[i] ?? null,
+      windGusts: hourly.wind_gusts_10m?.[i] ?? null,
+      visibility: typeof hourly.visibility?.[i] === 'number' ? Math.round(hourly.visibility[i] / 1000 * 10) / 10 : null,
+      solarRad: hourly.shortwave_radiation?.[i] ?? null,
+      cape: hourly.cape?.[i] ?? null,
+      vpd: hourly.vapour_pressure_deficit?.[i] ?? null,
+      isDay: hourly.is_day?.[i] ?? 1,
+      weathercode: hcode,
+      summary: weatherCodeSummary[hcode] || null,
     })
   }
 
@@ -510,13 +559,25 @@ const mapWeather = (raw, location) => {
   const forecast14 = []
   const dailyLen = daily.time?.length || 0
   for (let i = 0; i < dailyLen; i += 1) {
+    const dcode = daily.weathercode?.[i] ?? daily.weather_code?.[i]
     const entry = {
       day: formatDay(daily.time[i]),
+      date: daily.time[i],
       high: daily.temperature_2m_max?.[i],
       low: daily.temperature_2m_min?.[i],
       precip: (daily.precipitation_probability_max?.[i] || 0) / 100,
+      precipSum: daily.precipitation_sum?.[i] ?? 0,
+      rainSum: daily.rain_sum?.[i] ?? 0,
+      snowfallSum: daily.snowfall_sum?.[i] ?? 0,
+      windMax: daily.wind_speed_10m_max?.[i] ?? null,
+      windGustsMax: daily.wind_gusts_10m_max?.[i] ?? null,
+      windDirection: daily.wind_direction_10m_dominant?.[i] ?? null,
       uv: daily.uv_index_max?.[i],
-      weathercode: daily.weathercode?.[i],
+      solarRad: daily.shortwave_radiation_sum?.[i] ?? null,
+      sunrise: daily.sunrise?.[i],
+      sunset: daily.sunset?.[i],
+      weathercode: dcode,
+      summary: weatherCodeSummary[dcode] || null,
     }
     if (i < 3) forecast3.push(entry)
     if (i < 14) forecast14.push(entry)
@@ -525,9 +586,7 @@ const mapWeather = (raw, location) => {
   return { weather, hourlyData, forecast3, forecast14 }
 }
 
-const weatherCache = new Map()
-
-const mapWeatherApiBundle = (res, location) => {
+const mapWeatherApiBundle= (res, location) => {
   if (!res) throw new Error('WeatherAPI response empty')
   const weather = {
     locationId: location.id,
@@ -574,18 +633,21 @@ const mapWeatherApiBundle = (res, location) => {
   return { weather, hourlyData, forecast3, forecast14 }
 }
 
+// In-flight deduplication: concurrent hooks (useWeather/useHourly/useForecast/useExtendedForecast)
+// for the same location share a single Open-Meteo fetch instead of 4 separate calls.
+const bundleInFlight = new Map()
+
 export const getWeatherBundle = async (locationId) => {
   if (!locationId) return { weather: {}, hourlyData: [], forecast3: [], forecast14: [] }
 
-  const cachedMem = weatherCache.get(locationId)
-  if (cachedMem && Date.now() - cachedMem.ts < WEATHER_CACHE_TTL) return cachedMem.data
+  if (bundleInFlight.has(locationId)) return bundleInFlight.get(locationId)
 
-  const cachedStorage = loadWeatherCache(locationId)
-  if (cachedStorage) {
-    weatherCache.set(locationId, { ts: Date.now(), data: cachedStorage })
-    return cachedStorage
-  }
+  const promise = _fetchWeatherBundle(locationId).finally(() => bundleInFlight.delete(locationId))
+  bundleInFlight.set(locationId, promise)
+  return promise
+}
 
+const _fetchWeatherBundle = async (locationId) => {
   const location = await getLocationById(locationId)
   if (!location) throw new Error('Unknown location')
   if (location.lat == null || location.lon == null) throw new Error('Coordinates unavailable for this location')
@@ -598,8 +660,36 @@ export const getWeatherBundle = async (locationId) => {
       const res = await fetchWeatherApi({ lat: location.lat, lon: location.lon })
       mapped = mapWeatherApiBundle(res, location)
     } else {
-      const raw = await fetchWeatherRaw(location.lat, location.lon)
+      const [raw, aqiRaw] = await Promise.all([
+        fetchWeatherRaw(location.lat, location.lon),
+        fetchAirQualityRaw(location.lat, location.lon).catch(() => null),
+      ])
       mapped = mapWeather(raw, location)
+
+      // Merge current AQI data
+      if (aqiRaw?.current) {
+        mapped.weather.aqi = aqiRaw.current.us_aqi ?? null
+        mapped.weather.europeanAqi = aqiRaw.current.european_aqi ?? null
+        mapped.weather.pm25 = aqiRaw.current.pm2_5 ?? null
+        mapped.weather.pm10 = aqiRaw.current.pm10 ?? null
+        mapped.weather.co = aqiRaw.current.carbon_monoxide ?? null
+        mapped.weather.no2 = aqiRaw.current.nitrogen_dioxide ?? null
+        mapped.weather.so2 = aqiRaw.current.sulphur_dioxide ?? null
+        mapped.weather.o3 = aqiRaw.current.ozone ?? null
+      }
+
+      // Merge hourly AQI data
+      if (aqiRaw?.hourly) {
+        const aq = aqiRaw.hourly
+        mapped.hourlyData = mapped.hourlyData.map((h, i) => ({
+          ...h,
+          aqi: aq.us_aqi?.[i] ?? null,
+          pm25: aq.pm2_5?.[i] ?? null,
+          pm10: aq.pm10?.[i] ?? null,
+          o3: aq.ozone?.[i] ?? null,
+          no2: aq.nitrogen_dioxide?.[i] ?? null,
+        }))
+      }
     }
   } catch (error) {
     console.warn('Weather fetch failed, returning placeholder', error)
@@ -628,11 +718,73 @@ export const getWeatherBundle = async (locationId) => {
     }
   }
 
-  weatherCache.set(locationId, { ts: Date.now(), data: mapped })
-  saveWeatherCache(locationId, mapped)
   return mapped
 }
 
-export const emptyAlerts = async () => []
-export const emptyRisk = async () => ({})
+export const emptyAlerts = async (locationId) => {
+  if (!locationId) return []
+  try {
+    const bundle = await getWeatherBundle(locationId)
+    const { weather, forecast14 } = bundle
+    const alerts = []
+
+    if ((weather.uv ?? 0) >= 8) {
+      alerts.push({ id: 'uv-high', title: 'High UV Alert', severity: 'High', detail: `UV index is ${weather.uv}. Limit sun exposure 10 AM–4 PM and apply SPF 50+.` })
+    }
+    if ((weather.temp ?? 0) >= 38) {
+      alerts.push({ id: 'heat', title: 'Extreme Heat Alert', severity: 'High', detail: `Temperature is ${weather.temp}°C. Stay hydrated, avoid intense outdoor activity and direct sun.` })
+    }
+    if ((weather.temp ?? 0) >= 35 && (weather.uv ?? 0) >= 6) {
+      alerts.push({ id: 'heat-uv', title: 'Heat & UV Caution', severity: 'Moderate', detail: `Combined heat (${weather.temp}°C) and UV (${weather.uv}) elevate outdoor exposure risk.` })
+    }
+    const maxPrecipProb = (forecast14 || []).slice(0, 3).reduce((m, d) => Math.max(m, d.precip ?? 0), 0)
+    const maxPrecipMm = (forecast14 || []).slice(0, 3).reduce((m, d) => Math.max(m, d.precipSum ?? 0), 0)
+    if (maxPrecipProb > 0.7 || maxPrecipMm > 50) {
+      alerts.push({ id: 'rain-heavy', title: 'Heavy Rain Advisory', severity: 'Moderate', detail: `Heavy precipitation expected in the next 3 days (${Math.round(maxPrecipProb * 100)}% probability, up to ${maxPrecipMm.toFixed(1)} mm).` })
+    }
+    if ((weather.cape ?? 0) > 1000) {
+      alerts.push({ id: 'storm', title: 'Thunderstorm Risk', severity: 'High', detail: `High convective energy (CAPE ${Math.round(weather.cape)} J/kg). Thunderstorm development is possible.` })
+    } else if ((weather.cape ?? 0) > 500) {
+      alerts.push({ id: 'storm-moderate', title: 'Convective Activity', severity: 'Low', detail: `Moderate convective energy detected. Isolated thunderstorms possible.` })
+    }
+    if ((weather.windGusts ?? 0) > 60) {
+      alerts.push({ id: 'wind-strong', title: 'Strong Wind Advisory', severity: 'Moderate', detail: `Wind gusts up to ${weather.windGusts} km/h expected. Secure loose objects outdoors.` })
+    }
+    if ((weather.aqi ?? 0) > 150) {
+      alerts.push({ id: 'aqi-unhealthy', title: 'Poor Air Quality Alert', severity: 'High', detail: `AQI is ${weather.aqi} (Unhealthy). Sensitive groups should avoid prolonged outdoor exposure.` })
+    } else if ((weather.aqi ?? 0) > 100) {
+      alerts.push({ id: 'aqi-moderate', title: 'Moderate Air Quality', severity: 'Low', detail: `AQI is ${weather.aqi}. Sensitive individuals should limit extended outdoor activity.` })
+    }
+    if ((weather.visibility ?? 10) < 1) {
+      alerts.push({ id: 'fog', title: 'Low Visibility / Fog', severity: 'Moderate', detail: `Visibility is ${weather.visibility} km. Drive with caution and use low-beam headlights.` })
+    }
+
+    return alerts
+  } catch (_) {
+    return []
+  }
+}
+
+export const emptyRisk = async (locationId) => {
+  if (!locationId) return {}
+  try {
+    const bundle = await getWeatherBundle(locationId)
+    const { weather, forecast14 } = bundle
+
+    const maxPrecipProb = (forecast14 || []).slice(0, 7).reduce((m, d) => Math.max(m, d.precip ?? 0), 0)
+    const maxPrecipMm = (forecast14 || []).slice(0, 7).reduce((m, d) => Math.max(m, d.precipSum ?? 0), 0)
+    const flood = Math.min(1, maxPrecipProb * 0.5 + Math.min(0.5, maxPrecipMm / 100))
+
+    const heat = Math.min(1, Math.max(0, ((weather.temp ?? 28) - 30) / 15))
+
+    const gustFactor = (weather.windGusts ?? weather.wind ?? 0) / 90
+    const wind = Math.min(1, gustFactor)
+
+    const aqi = Math.min(1, (weather.aqi ?? 0) / 200)
+
+    return { flood, heat, wind, aqi }
+  } catch (_) {
+    return {}
+  }
+}
 

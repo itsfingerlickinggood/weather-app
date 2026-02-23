@@ -1,43 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import api, { fetchWithCache } from '../lib/api'
+import api from '../lib/api'
 import { getKeralaLocations, getLocationById, getWeatherBundle, emptyAlerts, emptyRisk } from '../lib/openMeteo'
 
 const isTestEnv = import.meta.env.MODE === 'test'
 const hasPrimaryApi = isTestEnv || !!import.meta.env.VITE_API_URL
 
-const withOfflineFlag = (payload) => {
-  const { data, offline } = payload
-  if (Array.isArray(data)) {
-    const copy = [...data]
-    copy.offline = offline
-    return copy
-  }
-  if (data && typeof data === 'object') return { ...data, offline }
-  return data
-}
-
 export const useLocations = () =>
   useQuery({
     queryKey: ['locations'],
     queryFn: async () => {
-      // Try primary API first if configured, otherwise use open-source fallback
       if (hasPrimaryApi) {
         try {
-          const { data, offline } = await fetchWithCache('locations', async () => {
-            const res = await api.get('/locations')
-            return res.data?.locations || []
-          })
-          const list = data || []
-          list.offline = offline
-          return list
+          const res = await api.get('/locations')
+          return res.data?.locations || []
         } catch (_e) {
           // fall through to open data fallback
         }
       }
-
-      const list = await getKeralaLocations()
-      list.offline = false
-      return list
+      return await getKeralaLocations()
     },
   })
 
@@ -46,20 +26,15 @@ export const useLocationDetail = (id) =>
     enabled: !!id,
     queryKey: ['locations', id],
     queryFn: async () => {
-        if (hasPrimaryApi) {
-          try {
-            const { data, offline } = await fetchWithCache(`location-${id}`, async () => {
-              const res = await api.get(`/locations/${id}`)
-              return res.data?.location || null
-            })
-            if (!data) return null
-            return { ...data, offline }
-          } catch (_e) {
-            // fallback below
-          }
+      if (hasPrimaryApi) {
+        try {
+          const res = await api.get(`/locations/${id}`)
+          return res.data?.location || null
+        } catch (_e) {
+          // fallback below
         }
-        const fallback = await getLocationById(id)
-        return fallback ? { ...fallback, offline: false } : null
+      }
+      return (await getLocationById(id)) || null
     },
   })
 
@@ -70,15 +45,16 @@ export const useWeather = (id) =>
     queryFn: async () => {
       if (hasPrimaryApi) {
         try {
-          const { data, offline } = await fetchWithCache(`weather-${id}`, async () => (await api.get(`/weather/${id}`)).data || {})
-          return { ...(data || {}), offline }
+          const res = await api.get(`/weather/${id}`)
+          return res.data || {}
         } catch (_e) {
           // fallback below
         }
       }
       const bundle = await getWeatherBundle(id)
-      return { ...(bundle.weather || {}), offline: false }
+      return bundle.weather || {}
     },
+    staleTime: 0,
   })
 
 export const useHourly = (id) =>
@@ -88,17 +64,16 @@ export const useHourly = (id) =>
     queryFn: async () => {
       if (hasPrimaryApi) {
         try {
-          return withOfflineFlag(await fetchWithCache(`hourly-${id}`, async () => (await api.get(`/weather/${id}/hourly`)).data?.hours || []))
+          const res = await api.get(`/weather/${id}/hourly`)
+          return res.data?.hours || []
         } catch (_e) {
           // fallback below
         }
       }
       const bundle = await getWeatherBundle(id)
-      const data = bundle.hourlyData || []
-      const copy = [...data]
-      copy.offline = false
-      return copy
+      return bundle.hourlyData || []
     },
+    staleTime: 0,
   })
 
 export const useForecast = (id) =>
@@ -108,17 +83,16 @@ export const useForecast = (id) =>
     queryFn: async () => {
       if (hasPrimaryApi) {
         try {
-          return withOfflineFlag(await fetchWithCache(`forecast-${id}`, async () => (await api.get(`/weather/${id}/forecast`)).data?.forecast || []))
+          const res = await api.get(`/weather/${id}/forecast`)
+          return res.data?.forecast || []
         } catch (_e) {
           // fallback below
         }
       }
       const bundle = await getWeatherBundle(id)
-      const data = bundle.forecast3 || []
-      const copy = [...data]
-      copy.offline = false
-      return copy
+      return bundle.forecast3 || []
     },
+    staleTime: 0,
   })
 
 export const useExtendedForecast = (id) =>
@@ -128,17 +102,16 @@ export const useExtendedForecast = (id) =>
     queryFn: async () => {
       if (hasPrimaryApi) {
         try {
-          return withOfflineFlag(await fetchWithCache(`forecast14-${id}`, async () => (await api.get(`/weather/${id}/forecast14`)).data?.forecast || []))
+          const res = await api.get(`/weather/${id}/forecast14`)
+          return res.data?.forecast || []
         } catch (_e) {
           // fallback below
         }
       }
       const bundle = await getWeatherBundle(id)
-      const data = bundle.forecast14 || []
-      const copy = [...data]
-      copy.offline = false
-      return copy
+      return bundle.forecast14 || []
     },
+    staleTime: 0,
   })
 
 export const useAlerts = (id) =>
@@ -148,16 +121,15 @@ export const useAlerts = (id) =>
     queryFn: async () => {
       if (hasPrimaryApi) {
         try {
-          return withOfflineFlag(await fetchWithCache(`alerts-${id}`, async () => (await api.get(`/alerts/${id}`)).data?.alerts || []))
+          const res = await api.get(`/alerts/${id}`)
+          return res.data?.alerts || []
         } catch (_e) {
           // fallback below
         }
       }
-      const data = await emptyAlerts(id)
-      const copy = [...data]
-      copy.offline = false
-      return copy
+      return await emptyAlerts(id)
     },
+    staleTime: 0,
   })
 
 export const useRisk = (id) =>
@@ -167,21 +139,45 @@ export const useRisk = (id) =>
     queryFn: async () => {
       if (hasPrimaryApi) {
         try {
-          return withOfflineFlag(await fetchWithCache(`risk-${id}`, async () => (await api.get(`/disaster-risk/${id}`)).data?.risk || {}))
+          const res = await api.get(`/disaster-risk/${id}`)
+          return res.data?.risk || {}
         } catch (_e) {
           // fallback below
         }
       }
-      const data = await emptyRisk(id)
-      return { ...(data || {}), offline: false }
+      return (await emptyRisk(id)) || {}
     },
+    staleTime: 0,
   })
+
+// Kerala monthly climate averages (used as fallback when backend is unavailable)
+const keralaClimateFallback = [
+  { month: 'Jan', avgHigh: 31, avgLow: 22, rainfall: 18 },
+  { month: 'Feb', avgHigh: 33, avgLow: 23, rainfall: 25 },
+  { month: 'Mar', avgHigh: 34, avgLow: 25, rainfall: 42 },
+  { month: 'Apr', avgHigh: 34, avgLow: 26, rainfall: 120 },
+  { month: 'May', avgHigh: 33, avgLow: 26, rainfall: 220 },
+  { month: 'Jun', avgHigh: 30, avgLow: 24, rainfall: 490 },
+  { month: 'Jul', avgHigh: 29, avgLow: 23, rainfall: 580 },
+  { month: 'Aug', avgHigh: 29, avgLow: 23, rainfall: 430 },
+  { month: 'Sep', avgHigh: 30, avgLow: 23, rainfall: 260 },
+  { month: 'Oct', avgHigh: 30, avgLow: 23, rainfall: 310 },
+  { month: 'Nov', avgHigh: 30, avgLow: 23, rainfall: 170 },
+  { month: 'Dec', avgHigh: 30, avgLow: 22, rainfall: 50 },
+]
 
 export const useClimateTrends = (id) =>
   useQuery({
     enabled: !!id,
     queryKey: ['climate-trends', id],
-    queryFn: async () => (await api.get(`/climate/${id}/historical`)).data.trends,
+    queryFn: async () => {
+      try {
+        const res = await api.get(`/climate/${id}/historical`)
+        return res.data.trends
+      } catch (_e) {
+        return keralaClimateFallback
+      }
+    },
   })
 
 export const useRadarSettings = () =>
@@ -250,20 +246,16 @@ export const useFavorites = () => {
     queryFn: async () => {
       if (hasPrimaryApi) {
         try {
-          const result = await fetchWithCache('favorites', async () => (await api.get('/favorites')).data.favorites)
-          const filtered = (result.data || []).filter((id) => validIds.size === 0 || validIds.has(id))
-          const copy = [...filtered]
-          copy.offline = result.offline
-          return copy
+          const res = await api.get('/favorites')
+          const list = res.data?.favorites || []
+          return list.filter((id) => validIds.size === 0 || validIds.has(id))
         } catch (_e) {
           // fallback below
         }
       }
-      const local = loadLocalFavorites().filter((id) => validIds.size === 0 || validIds.has(id))
-      const copy = [...local]
-      copy.offline = false
-      return copy
+      return loadLocalFavorites().filter((id) => validIds.size === 0 || validIds.has(id))
     },
+    staleTime: 0,
   })
 
   const addFavorite = useMutation({
